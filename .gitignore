@@ -6,6 +6,12 @@
 !/Code.gs
 !/Index.html
 !/appsscript.json
+!/cli.mjs
+!/lib/
+/lib/*
+!/lib/local.mjs
+!/lib/engine.mjs
+!/lib/google.mjs
 !/scripts/
 /scripts/*
 !/scripts/build-single.py
@@ -15,8 +21,10 @@
 !/tests/
 /tests/*
 !/tests/core.test.cjs
+!/tests/cli.test.mjs
 
 # Defense in depth for private files at any depth.
+.local/
 .DS_Store
 .DS_Store?
 ._*
