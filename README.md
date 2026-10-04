@@ -1,4 +1,171 @@
-# LinkedIn → Notion 申請紀錄小幫手
+# LinkedIn → Notion Application Tracker
+
+[English](#english) · [繁體中文](#繁體中文)
+
+## English
+
+### What is this tool?
+
+This is a **private web app that turns LinkedIn application confirmation emails in your Gmail into job application records in Notion**. It saves you from copying company names, job titles, links, and application dates into a tracker by hand.
+
+You choose a date range, preview the matching emails, and click Import. The tool checks your Notion database for existing applications before creating new records. It supports **English and Traditional Chinese confirmation emails**.
+
+| What it saves | Notion field |
+|---|---|
+| Company name | Company |
+| Job title | Position |
+| Initial application status (`Applied`) | Status |
+| LinkedIn job link | Website |
+| Application date stated in the email | Apply Date |
+
+**Where it runs:** in your own Google account using Google Apps Script. You deploy it once and bookmark the resulting web app URL. Whenever you want to import applications, open that URL, choose dates, preview, and import. You do not need to redeploy each time or keep Codex open. Keep the page open until processing finishes; there is no scheduled background sync.
+
+**What you need:** a Google account receiving the emails and a Notion database you can edit. No Python, Node.js, terminal, or OpenAI/ChatGPT/Codex API key is needed for normal use. The app interface currently uses Traditional Chinese; the instructions below include the button labels.
+
+There is no message-count selector or fixed 50-email total limit. The app automatically reads additional pages and imports in batches. Google and Notion quotas and execution limits still apply; errors stop processing, and a fresh preview checks what has already been imported.
+
+### One-time setup
+
+Gmail and Notion each require your authorization. Gmail uses Google's sign-in permission flow. Notion requires a private connection and its secret. This version does not provide a hosted Notion OAuth service, so that initial Notion setup is still necessary.
+
+#### 1. Install in your Google account
+
+1. Sign in to the Google account that **receives the LinkedIn emails**, open [Google Apps Script](https://script.google.com/home/start), and click **New project**.
+2. Name the project, for example, “Application Tracker”.
+3. Open [SingleFile.gs](SingleFile.gs) on GitHub, click **Raw**, and copy the entire file.
+4. In Apps Script, replace all default content in `Code.gs` with that text and save. **Do not also paste the other `.gs` files or create an HTML file.** The single-file version includes the interface.
+5. Open **Project Settings** using the gear icon and enable **Show “appsscript.json” manifest file in editor**.
+6. Return to the editor and replace `appsscript.json` with the contents of this repository's [appsscript.json](appsscript.json). Save. This manifest keeps Gmail access read-only.
+7. Check that **Services** lists **Gmail API**. If missing, click `+`, select Gmail API **v1**, and add it with the identifier `Gmail`.
+
+Only two files need to be copied: the packaged script and its permission settings. The other source files are for development.
+
+#### 2. Deploy and get your tool URL
+
+1. Click **Deploy → New deployment** at the top right.
+2. Click the gear beside **Select type**, then choose **Web app**.
+3. Set **Execute as** to **Me**.
+4. Set **Who has access** to **Only myself**.
+5. Click **Deploy**. If prompted, choose **Authorize access**, select the receiving Google account, review the read-only Gmail and external connection permissions, and complete authorization.
+6. Open the resulting **Web app URL** and bookmark it. This is the URL you will use every time.
+
+If Google shows an unverified-app notice, first verify that it is your own project with the expected code. Do not authorize an unfamiliar app. Organization policies may require administrator assistance. If using a custom Google Cloud project, enable the Gmail API in that project too.
+
+#### 3. Prepare and authorize Notion
+
+Create an empty database, or obtain the optional template from its creator's original link below. Configure these exact property names and types:
+
+| Property | Notion type | Requirement |
+|---|---|---|
+| Company | Title | Rename the default Name property if needed |
+| Position | Text | Job title |
+| Status | Select | Include an option named `Applied` |
+| Website | Text | Clickable job link |
+| Apply Date | Date | Application date |
+
+Use **Select**, not Notion's Status type, for `Status`. Both `Position` and `Website` must be Text. Check existing data before changing a template's property types; the app does not change them for you.
+
+1. Open [Notion integrations](https://www.notion.so/profile/integrations) and create an **Internal integration / Internal connection** in the workspace containing your database.
+2. Enable **Read content** and **Insert content**, then copy the **Internal Integration Secret**.
+3. Open the **original database** in Notion, use its `…` menu → **Connections**, and add that connection. Creating a secret alone does not grant access to the database.
+4. Open the table using **Open as full page**, then choose `…` → **Copy link**.
+
+For a Job Tracker inside a Job Finder page, use the link to the actual Job Tracker database, not the outer page or an individual application row. For a linked view, open the original database.
+
+#### 4. Connect from the tool's setup screen
+
+1. Open your bookmarked tool URL and expand **首次設定／更換 Notion 連線** (first-time setup / change Notion connection).
+2. Paste the secret into **Notion 連線密鑰** and the database link into **資料庫連結**.
+3. Click **連接 Notion** (connect Notion). The app discovers the data source and validates the properties. If there are multiple sources, choose the correct table and click Connect again.
+4. Once connected, start using the date search. You do not need to find a data source ID or manually edit Script Properties.
+
+The secret is sent through your own Apps Script project to Notion for validation. After successful validation, it is saved in your private project's settings, not GitHub, and is never returned in preview results. The secret input is cleared. Project editors can access settings, so keep the project private and do not share screenshots containing credentials.
+
+### Everyday use
+
+1. Open your bookmarked web app URL.
+2. Choose **開始日期** (start date) and **結束日期** (end date). Both days are included. Leave either end blank for no bound; leave both blank to search all matching historical confirmations.
+3. Click **檢查並預覽** (check and preview). Wait for the date-range search to finish; additional pages are loaded automatically.
+4. Review the results: **可新增** means a candidate for import, **已存在** means already present, and **待確認** requires manual review.
+5. Click **匯入可新增項目** (import new candidates) and keep the page open until completion. Notion is checked again before records are created.
+
+Search uses the **email receipt date** in your browser's timezone. `Apply Date` uses the date stated inside the email. Preview is read-only; Import creates records. Existing application statuses are preserved. Close the page after completion and reopen the same URL next time—no repeated deployment or setup is needed unless authorization is revoked or expires.
+
+### Updating an existing installation
+
+1. Replace Apps Script's `Code.gs` with the latest `SingleFile.gs`; do not append a second copy.
+2. Use the latest `appsscript.json`. An old `Index.html` may remain, but the packaged version does not use it.
+3. Choose **Deploy → Manage deployments → Edit (pencil) → New version → Deploy**.
+4. Refresh your existing tool URL. Saving code alone does not update the deployed version.
+
+Existing Notion settings can be reused.
+
+### Troubleshooting
+
+| Problem | What to check |
+|---|---|
+| `Gmail is not defined` | Add Gmail API v1 under Services and deploy a new version. |
+| No emails found | Receiving Google account, selected dates, and supported confirmation subject. |
+| Notion 401 | Reconnect using a valid secret. |
+| Notion 403 / 404 | Database Connections, workspace, and original database link. |
+| Property type mismatch | Match the five properties in the setup table. |
+| Preview expired | Preview again. Tickets last approximately 30 minutes; Google may evict cached items sooner. |
+| Long processing or quota error | Use a shorter date range and preview again. Existing records are skipped. |
+| Old preview fails after changing databases | Preview again to avoid writing to the wrong destination. |
+
+### Supported formats and recovery
+
+- Supports Traditional Chinese “您的應徵資料已傳送到” and English “Your application was sent to” / “Your application has been sent to” confirmations. Simplified Chinese is not searched.
+- English dates support the labels Date applied, Applied on, and Application date, with English month names or ISO dates. Ambiguous numeric dates are flagged for review rather than guessed.
+- Traditional Chinese parsing was previously checked against real messages; English parsing uses synthetic tests. Other subjects, HTML-only emails, or different layouts may not be supported.
+- Duplicate detection prioritizes the LinkedIn job ID, then compares company, position, and date. Cross-batch duplicates are checked again during import.
+- If a batch fails, subsequent imports stop. Completed results remain visible; preview again to check progress. Processing is subject to service quotas, and there is no automatic background resume.
+- An uncertain write failure retains a pending marker instead of blindly retrying. Check Notion first; only if the record definitely was not created should you remove the matching `job:source:job-id` marker from Script Properties.
+- The execution lock covers this Apps Script project only. Other tools writing at the same time can still cause a race.
+
+### Optional third-party template and licensing
+
+[Job Tracker: The Ultimate Job Search Companion](https://www.notion.com/templates/job-tracker-the-ultimate-job-search-companion) is an optional template by **Niko**. Obtain it from the creator's original listing for use in your workspace, or create your own empty database with the five required properties.
+
+This repository contains an independent importer and its required property configuration. It does not distribute the template's pages, layout, images, copy, exports, or a redistributable template copy, and is not endorsed by the creator or Notion.
+
+Public information was checked on **2026-10-03**. No explicit permission to repackage, redistribute, or open-source this template was found on the listing or linked creator store. Free availability does not establish those rights. The [Notion Marketplace terms](https://www.notion.com/help/template-gallery-guidelines-and-terms) retain creators' ownership and grant end users access and use rights. Their explicit prohibition on reposting purchased creator content does not by itself settle the treatment of every free template.
+
+The repository links to the original template rather than redistributing it. Obtain explicit permission from the creator before publishing the template itself or a modified copy. The listing includes an **Email the creator** contact link. This is a practical assessment of public information, not a licensing confirmation from the creator.
+
+### Privacy and development
+
+The repository contains no private accounts, Notion IDs, credentials, real emails, application records, or private screenshots. `.gitignore` uses a reviewed file allowlist; tracked files still require content review.
+
+Developers should edit `Code.gs` and `Index.html`, regenerate the packaged script, and test:
+
+```sh
+python3 scripts/build-single.py
+node tests/core.test.cjs
+git config core.hooksPath scripts
+python3 scripts/check-private.py
+```
+
+Commit/push checks scan tracked content and history, not account folders on your computer. Automated scanning cannot guarantee complete privacy; review changes before committing. `SingleFile.gs` is the generated app used for deployment.
+
+### Official documentation
+
+- [Google web app deployment](https://developers.google.com/apps-script/guides/web)
+- [Google manifest settings](https://developers.google.com/apps-script/guides/manifest)
+- [Gmail API service](https://developers.google.com/apps-script/advanced/gmail)
+- [Notion authorization](https://developers.notion.com/guides/get-started/authorization)
+
+---
+
+## 繁體中文
+
+### 這是什麼工具？
+
+這是一個**將 Gmail 裡的 LinkedIn 申請確認信，整理成 Notion 求職紀錄的私人網頁工具**。你不必再逐封複製公司名稱、職位、職缺連結與應徵日期。
+
+選擇日期範圍、預覽結果，再按匯入，工具就會把資料寫到 Notion 的 Company、Position、Status、Website、Apply Date 五個欄位。新增前會檢查重複，新增狀態為 `Applied`，既有紀錄的狀態會保留。支援繁體中文與英文確認信；操作介面目前使用繁體中文。
+
+**工具放在哪裡？** 它執行在你自己的 Google Apps Script 帳號裡。第一次部署後，把產生的工具網址加入書籤；之後需要匯入時打開網址即可，不用每次重新部署，也不用開 Codex。操作時保持頁面開啟，完成後就可以關閉。它是手動工具，沒有背景自動同步。
 
 **平常只要：選日期 → 預覽 → 匯入。** 支援繁體中文與英文 LinkedIn 申請已送出確認信，新增前會檢查 Notion 是否已有相同申請。
 
