@@ -17,3 +17,28 @@ let settings={};ctx.PropertiesService={getScriptProperties:()=>({getProperty:k=>
 assert.throws(()=>ctx.dataSource_());
 settings.NOTION_DATA_SOURCE_ID='0'.repeat(32);assert.equal(ctx.dataSource_(),'0'.repeat(32));
 console.log('Synthetic parser, duplicate checks and private configuration tests passed.');
+// Search range boundaries and query injection rejection.
+const start=Date.parse('2020-01-02T00:00:00Z')/1000,end=start+86400;
+assert(ctx.searchQuery_({startSeconds:start,endSeconds:end}).endsWith(` after:${start-1} before:${end}`));
+assert(!ctx.searchQuery_().includes(' after:'));
+assert(ctx.searchQuery_({endSeconds:end}).endsWith(` before:${end}`));
+assert(ctx.searchQuery_({startSeconds:start}).endsWith(` after:${start-1}`));
+for(const range of [{startSeconds:'1 OR from:anyone'},{startSeconds:1.5},{startSeconds:-1},{startSeconds:end,endSeconds:start},{startSeconds:start,endSeconds:start}]) assert.throws(()=>ctx.searchQuery_(range));
+// Run client date conversion in a DST-observing zone.
+process.env.TZ='America/New_York';
+const fields={startDate:{value:'2020-03-08',checkValidity:()=>true},endDate:{value:'2020-03-08',checkValidity:()=>true}};
+const html=fs.readFileSync('Index.html','utf8');
+const dateCode=html.slice(html.indexOf('function dateRange(){'),html.indexOf("$('dateHint').textContent"));
+const ui={$:id=>fields[id]};vm.createContext(ui);vm.runInContext(dateCode,ui);
+assert.equal(ui.dateRange().endSeconds-ui.dateRange().startSeconds,23*3600);
+fields.startDate.value=fields.endDate.value='2020-11-01';
+assert.equal(ui.dateRange().endSeconds-ui.dateRange().startSeconds,25*3600);
+fields.startDate.value='2020-11-02';assert.throws(()=>ui.dateRange());
+fields.startDate.value='';fields.endDate.value='';assert.equal(ui.dateRange().startSeconds,null);
+// Verify the actual Gmail call gets the range and exposes truncation.
+let captured;ctx.checkSchema_=()=>{};ctx.existing_=()=>[];
+ctx.Gmail={Users:{Messages:{list:(user,args)=>{captured=args;return {messages:[],nextPageToken:'synthetic-next'};}}}};
+ctx.Utilities={getUuid:()=> 'synthetic-preview'};ctx.CacheService={getUserCache:()=>({put:()=>{}})};
+assert.equal(ctx.previewApplications(5,{startSeconds:start,endSeconds:end}).hasMore,true);
+assert.equal(captured.q,ctx.searchQuery_({startSeconds:start,endSeconds:end}));
+console.log('Date range validation, Gmail query, result cap, and 23/25-hour inclusive-day tests passed.');

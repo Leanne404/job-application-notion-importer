@@ -93,21 +93,36 @@ function message_(id) {
   const header=n=>(m.payload.headers.find(h=>h.name.toLowerCase()===n)||{}).value||'';
   return {id:m.id,sender:header('from'),subject:header('subject'),body:body_(m.payload),timestamp:Number(m.internalDate)};
 }
-function previewApplications(limit) {
+function searchQuery_(range) {
+  if (range === undefined || range === null) return MAIL_QUERY;
+  if (typeof range !== 'object' || Array.isArray(range)) throw Error('日期範圍格式錯誤');
+  const start = range.startSeconds, end = range.endSeconds;
+  const valid = v => v == null || (Number.isSafeInteger(v) && v >= 0 && v <= 253402214400);
+  if (!valid(start) || !valid(end)) throw Error('日期範圍格式錯誤');
+  if (start != null && end != null && start >= end) throw Error('開始日期不能晚於結束日期');
+  // Gmail date strings use Pacific time; epoch seconds preserve the browser's local days.
+  return MAIL_QUERY + (start != null ? ' after:' + (start - 1) : '') +
+    (end != null ? ' before:' + end : '');
+}
+function previewApplications(limit, range) {
   limit=Number(limit); if(![5,10,25,50].includes(limit)) throw Error('請選擇有效筆數');
+  const query=searchQuery_(range);
   checkSchema_();
-  const response=Gmail.Users.Messages.list('me',{q:MAIL_QUERY,maxResults:limit});
+  const response=Gmail.Users.Messages.list('me',{q:query,maxResults:limit});
   const rows=existing_(), results=[];
   for(const ref of response.messages||[]) {
     try {
-      const a=parse_(message_(ref.id)), d=decision_(a,rows);
+      const message=message_(ref.id);
+      if (range && ((range.startSeconds != null && message.timestamp < range.startSeconds*1000) ||
+          (range.endSeconds != null && message.timestamp >= range.endSeconds*1000))) continue;
+      const a=parse_(message), d=decision_(a,rows);
       results.push(Object.assign({},a,d)); if(d.state==='new') rows.push(a);
     } catch(e) { results.push({messageId:ref.id,state:'review',reason:e.message}); }
   }
   // Persist only IDs server-side. Import re-reads original messages and Notion.
   const ticket=Utilities.getUuid();
   CacheService.getUserCache().put('preview:'+ticket,JSON.stringify(results.filter(r=>r.state==='new').map(r=>r.messageId)),1800);
-  return {ticket,results};
+  return {ticket,results,hasMore:!!response.nextPageToken};
 }
 function importApplications(ticket) {
   const lock=LockService.getScriptLock();
