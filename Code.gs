@@ -92,6 +92,33 @@ function validateSchema_(p) {
   if(!p.Status.select.options.some(o=>o.name==='Applied')) throw Error('The Status property needs an Applied option.');
 }
 function checkSchema_() { validateSchema_(notion_('data_sources/'+dataSource_()).properties); }
+function writableIcon_(icon) {
+  if(!icon || typeof icon!=='object') return null;
+  if(icon.type==='emoji' && typeof icon.emoji==='string' && icon.emoji) return {type:'emoji',emoji:icon.emoji};
+  if(icon.type==='custom_emoji' && icon.custom_emoji && icon.custom_emoji.id) return {type:'custom_emoji',custom_emoji:{id:icon.custom_emoji.id}};
+  if(icon.type==='icon' && icon.icon && typeof icon.icon.name==='string' && icon.icon.name) {
+    const native={name:icon.icon.name};
+    if(typeof icon.icon.color==='string' && icon.icon.color) native.color=icon.icon.color;
+    return {type:'icon',icon:native};
+  }
+  if(icon.type==='external' && icon.external && typeof icon.external.url==='string' && /^https:\/\//i.test(icon.external.url)) return {type:'external',external:{url:icon.external.url}};
+  return null;
+}
+function defaultPageIcon_() {
+  // Pages created in Notion inherit the default template icon. The API does not, unless the icon is copied.
+  let cursor, seen={};
+  try {
+    do {
+      const page=notion_('data_sources/'+dataSource_()+'/templates'+(cursor?'?start_cursor='+encodeURIComponent(cursor):''));
+      const template=(page.templates||[]).find(item=>item && item.is_default && item.id);
+      if(template) return writableIcon_(notion_('pages/'+template.id).icon);
+      if(page.has_more && (!page.next_cursor || seen[page.next_cursor])) return null;
+      if(page.next_cursor) seen[page.next_cursor]=true;
+      cursor=page.has_more?page.next_cursor:null;
+    } while(cursor);
+  } catch(e) { return null; }
+  return null;
+}
 function connectionStatus() {
   const p=PropertiesService.getScriptProperties();
   return {ready:!!(p.getProperty('NOTION_TOKEN') && p.getProperty('NOTION_DATA_SOURCE_ID'))};
@@ -197,7 +224,7 @@ function importApplications(ticket) {
     const preview=JSON.parse(raw);
     if(preview.source!==dataSource_()) throw Error('The Notion connection changed. Preview again.');
     checkSchema_();
-    const rows=existing_(), results=[];
+    const rows=existing_(), results=[], icon=preview.ids.length?defaultPageIcon_():null;
     for(const id of preview.ids) {
       let a;
       try {
@@ -211,7 +238,9 @@ function importApplications(ticket) {
         const properties={Company:{title:rt(a.Company)},Position:{rich_text:rt(a.Position)},Status:{select:{name:'Applied'}},
           Website:{rich_text:[{type:'text',text:{content:a.Website,link:{url:a.Website}}}]},'Apply Date':{date:{start:a['Apply Date']}}};
         ledger.setProperty(lk,'pending');
-        const created=notion_('pages','post',{parent:{type:'data_source_id',data_source_id:dataSource_()},properties});
+        const payload={parent:{type:'data_source_id',data_source_id:dataSource_()},properties};
+        if(icon) payload.icon=icon;
+        const created=notion_('pages','post',payload);
         ledger.setProperty(lk,created.id);
         rows.push(a); results.push(Object.assign({},a,{state:'created',reason:'Created',url:created.url}));
       } catch(e) {
