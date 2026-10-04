@@ -5,25 +5,53 @@ function dataSource_() {
   }
   return id;
 }
-const MAIL_QUERY = 'from:jobs-noreply@linkedin.com subject:"您的應徵資料已傳送到"';
+const MAIL_QUERY = 'from:jobs-noreply@linkedin.com {subject:"您的應徵資料已傳送到" subject:"您的申请已发送至" subject:"您的申请已发送给" subject:"您的申请资料已发送至" subject:"您的申请资料已发送给" subject:"Your application was sent to" subject:"Your application has been sent to"}';
 function doGet() {
   return HtmlService.createHtmlOutputFromFile('Index').setTitle('申請紀錄小幫手');
 }
 function norm_(s) { return String(s || '').normalize('NFKC').toLowerCase().replace(/\s+/g,' ').trim(); }
 function ids_(s) { return [...String(s || '').matchAll(/https?:\/\/(?:[\w-]+\.)?linkedin\.com\/(?:comm\/)?jobs\/view\/(\d+)/gi)].map(m=>m[1]); }
+function confirmationCompany_(line) {
+  const m=String(line||'').trim().match(/^(?:您的應徵資料已傳送到|您的申请(?:资料)?已发送(?:至|给)|Your application (?:was|has been) sent to)\s*(.+)$/i);
+  return m ? m[1].trim() : null;
+}
+function applicationDate_(main) {
+  let m=main.match(/(?:應徵日期|申请日期)\s*[：:]\s*(\d{4})年(\d{1,2})月(\d{1,2})日/);
+  let y,month,day;
+  if(m) { [,y,month,day]=m; }
+  else {
+    const dateLine=main.match(/(?:Date applied|Applied on|Application date)\s*[:：]?\s*([^\r\n]+)/i);
+    if(!dateLine) throw Error('缺少明確申請日期，請手動確認');
+    const value=dateLine[1].replace(/-{3,}.*$/,'').trim();
+    const months=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+    if((m=value.match(/^(\d{4})-(\d{2})-(\d{2})$/))) [,y,month,day]=m;
+    else if((m=value.match(/^([A-Za-z]+)\.? (\d{1,2})(?:st|nd|rd|th)?,? (\d{4})$/))) {
+      month=months.indexOf(m[1].toLowerCase().slice(0,3))+1;day=m[2];y=m[3];
+    } else if((m=value.match(/^(\d{1,2})(?:st|nd|rd|th)? ([A-Za-z]+)\.?,? (\d{4})$/))) {
+      day=m[1];month=months.indexOf(m[2].toLowerCase().slice(0,3))+1;y=m[3];
+    } else throw Error('申請日期格式不明確，請手動確認');
+  }
+  const iso=String(y)+'-'+String(month).padStart(2,'0')+'-'+String(day).padStart(2,'0');
+  const parsed=new Date(iso+'T00:00:00Z');
+  if(!Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0,10)!==iso) throw Error('日期格式不正確');
+  return iso;
+}
 function parse_(m) {
-  if (!/(?:^|[<\s])jobs-noreply@linkedin\.com(?:>|$)/i.test(m.sender) || !m.subject.includes('您的應徵資料已傳送到')) throw Error('不是支援的 LinkedIn 申請確認信');
-  const main = m.body.split('下一步')[0];
-  const lines = main.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
-  if (!lines[0] || !lines[0].startsWith('您的應徵資料已傳送到')) throw Error('信件格式不同，請手動確認');
-  const company = lines[0].split('您的應徵資料已傳送到')[1].trim();
-  if (!company || norm_(company)!==norm_(lines[2])) throw Error('公司資訊不一致');
-  const ids = [...new Set(ids_(main))];
-  const d = main.match(/應徵日期\s*[：:]\s*(\d{4})年(\d{1,2})月(\d{1,2})日/);
-  if (ids.length!==1 || !d || !lines[1]) throw Error('缺少明確職缺連結、職位或申請日期');
-  const ds = d[1]+'-'+d[2].padStart(2,'0')+'-'+d[3].padStart(2,'0');
-  if (new Date(ds+'T00:00:00Z').toISOString().slice(0,10)!==ds) throw Error('日期格式不正確');
-  return {Company:company, Position:lines[1], Status:'Applied', Website:'https://www.linkedin.com/jobs/view/'+ids[0]+'/', 'Apply Date':ds, messageId:m.id};
+  if (!/(?:^|[<\s])jobs-noreply@linkedin\.com(?:>|$)/i.test(m.sender)) throw Error('不是 LinkedIn 確認信寄件者');
+  if (!/(?:您的應徵資料已傳送到|您的申请(?:资料)?已发送(?:至|给)|Your application (?:was|has been) sent to)/i.test(m.subject)) throw Error('不是支援的申請確認信');
+  const lines=String(m.body||'').split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+  const header=lines.findIndex(line=>confirmationCompany_(line));
+  if(header<0) throw Error('信件格式不同，請手動確認');
+  const company=confirmationCompany_(lines[header]),position=lines[header+1];
+  if(!position || norm_(company)!==norm_(lines[header+2])) throw Error('公司資訊不一致');
+  // Bound the card at its explicit application-date line, before recommendations.
+  const dateIndex=lines.findIndex((line,i)=>i>header+2 && /^(?:應徵日期|申请日期|Date applied|Applied on|Application date)\s*[:：]?/i.test(line));
+  if(dateIndex<0) throw Error('缺少明確申請日期，請手動確認');
+  const main=lines.slice(header,dateIndex+1).join('\n');
+  const ids=[...new Set(ids_(main))];
+  if(ids.length!==1) throw Error('缺少或無法確認主職缺連結');
+  return {Company:company,Position:position,Status:'Applied',Website:'https://www.linkedin.com/jobs/view/'+ids[0]+'/',
+    'Apply Date':applicationDate_(main),messageId:m.id};
 }
 function decision_(a, rows) {
   const ai = ids_(a.Website);

@@ -4,7 +4,7 @@
 </style></head><body><main><div class="eyebrow">GMAIL → NOTION</div><h1>申請紀錄小幫手</h1><p>把 LinkedIn 申請確認信，整理到你的 Job Tracker。</p>
 <div class="panel"><div class="toolbar" style="margin-bottom:16px"><label for="startDate">開始日期</label><input type="date" id="startDate" min="1970-01-01" max="9998-12-31"><label for="endDate">結束日期</label><input type="date" id="endDate" min="1970-01-01" max="9998-12-31"></div><p class="muted" id="dateHint"></p><div class="toolbar"><label for="limit">範圍內最多讀取</label><select id="limit"><option value="5">5 封確認信</option><option value="10">10 封確認信</option><option value="25">25 封確認信</option><option value="50">50 封確認信</option></select><button id="preview">檢查並預覽</button><button class="secondary" id="import" disabled>匯入可新增項目</button></div><div id="message" role="status" aria-live="polite">先預覽五筆，確認欄位後即可匯入。</div><p class="muted">只新增缺少的申請。相同職缺會跳過；可能重複的紀錄會列出待確認。既有申請的狀態會保留。</p></div>
 <div class="panel table"><div id="empty">預覽會顯示公司、職位、申請日期，以及重複檢查結果。</div><table id="table" hidden><thead><tr><th>Company</th><th>Position</th><th>Status</th><th>Website</th><th>Apply Date</th><th>檢查結果</th></tr></thead><tbody id="rows"></tbody></table></div>
-<p class="muted">目前支援繁體中文 LinkedIn「您的應徵資料已傳送到」確認信。其他格式會保留給你手動確認。</p></main>
+<p class="muted">支援中英文 LinkedIn 申請已送出確認信（繁中／簡中／英文）。搜尋到但無法解析的格式會列為待確認。</p></main>
 <script>
 let ticket=null;const $=id=>document.getElementById(id);const labels={new:'可新增',duplicate:'已存在',review:'待確認',created:'已新增',error:'未完成'};
 function busy(v){$('preview').disabled=v;$('limit').disabled=v;$('startDate').disabled=v;$('endDate').disabled=v;$('import').disabled=v||!ticket;}
