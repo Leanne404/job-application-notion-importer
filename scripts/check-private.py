@@ -4,7 +4,7 @@ import re
 import subprocess
 import sys
 
-ALLOWED = {'Code.gs', 'Index.html', 'appsscript.json', 'README.md', '.gitignore',
+ALLOWED = {'SingleFile.gs', 'scripts/build-single.py', 'Code.gs', 'Index.html', 'appsscript.json', 'README.md', '.gitignore',
            'scripts/check-private.py', 'scripts/pre-commit', 'scripts/pre-push',
            'tests/core.test.cjs'}
 PATTERNS = {

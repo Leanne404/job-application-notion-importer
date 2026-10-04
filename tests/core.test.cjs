@@ -39,7 +39,7 @@ fields.startDate.value='';fields.endDate.value='';assert.equal(ui.dateRange().st
 let captured;ctx.checkSchema_=()=>{};ctx.existing_=()=>[];
 ctx.Gmail={Users:{Messages:{list:(user,args)=>{captured=args;return {messages:[],nextPageToken:'synthetic-next'};}}}};
 ctx.Utilities={getUuid:()=> 'synthetic-preview'};ctx.CacheService={getUserCache:()=>({put:()=>{}})};
-assert.equal(ctx.previewApplications(5,{startSeconds:start,endSeconds:end}).hasMore,true);
+assert.equal(ctx.previewApplications({startSeconds:start,endSeconds:end}).nextCursor,'synthetic-next');
 assert.equal(captured.q,ctx.searchQuery_({startSeconds:start,endSeconds:end}));
 console.log('Date range validation, Gmail query, result cap, and 23/25-hour inclusive-day tests passed.');
 for(const title of ['Your application was sent to','Your application has been sent to']) {
@@ -51,11 +51,68 @@ for(const title of ['Your application was sent to','Your application has been se
   }
 }
 const zh={...sample,subject:'您的申请已发送至Example Company',body:sample.body.replace('您的應徵資料已傳送到','您的申请已发送至').replace('應徵日期','申请日期')};
-assert.equal(ctx.parse_(zh).Company,'Example Company');
+assert.throws(()=>ctx.parse_(zh));
 assert.throws(()=>ctx.parse_({...sample,subject:'Your application was viewed'}));
 assert.throws(()=>ctx.applicationDate_('Date applied: 01/02/2020'));
 assert.throws(()=>ctx.applicationDate_('Applied on: February 30, 2020'));
 assert.equal(ctx.applicationDate_('Application date: 2 Jan 2020'),'2020-01-02');
 assert(ctx.searchQuery_().includes('subject:"Your application was sent to"'));
-assert(ctx.searchQuery_().includes('subject:"您的申请已发送至"'));
+assert(!ctx.searchQuery_().includes('您的申请'));
 console.log('Chinese/English confirmation, explicit dates, recommendation exclusion and cross-language deduplication passed.');
+// Connection setup validates access/schema before saving, and never returns secrets.
+const realNotion=ctx.notion_, source='1'.repeat(32), other='2'.repeat(32), database='3'.repeat(32);
+const schema={Company:{type:'title'},Position:{type:'rich_text'},Website:{type:'rich_text'},'Apply Date':{type:'date'},Status:{type:'select',select:{options:[{name:'Applied'}]}}};
+let saved={},unlocks=0;
+ctx.LockService={getScriptLock:()=>({tryLock:()=>true,releaseLock:()=>unlocks++})};
+ctx.PropertiesService={getScriptProperties:()=>({getProperty:k=>saved[k],setProperties:o=>Object.assign(saved,o),setProperty:(k,v)=>saved[k]=v})};
+ctx.notion_=(path)=>path.startsWith('databases/')?{data_sources:[{id:source,name:'Example'}]}:{properties:schema};
+const fakeSecret='ntn_'+'synthetic';
+const setup=ctx.saveConnection(fakeSecret,'https://www.notion.so/Example-'+database+'?v=ignored');
+assert.equal(setup.ready,true);assert(!JSON.stringify(setup).includes(fakeSecret));assert.equal(saved.NOTION_DATA_SOURCE_ID,source);
+ctx.notion_=()=>({data_sources:[{id:source,name:'One'},{id:other,name:'Two'}]});
+assert.equal(ctx.saveConnection(fakeSecret,database).sources.length,2);
+assert.throws(()=>ctx.saveConnection(fakeSecret,database,'not-a-source'));
+ctx.notion_=()=>{throw Error('access failure');};
+assert.throws(()=>ctx.saveConnection(fakeSecret,database));assert.equal(saved.NOTION_DATA_SOURCE_ID,source);
+assert.throws(()=>ctx.databaseId_('https://example.com/'+database));
+// Multiple pages including >50 messages; tickets are tied to the destination.
+let cache={},seq=0,existing=[];
+ctx.CacheService={getUserCache:()=>({put:(k,v)=>cache[k]=v,get:k=>cache[k],remove:k=>delete cache[k]})};
+ctx.Utilities={getUuid:()=>String(++seq)};
+ctx.existing_=()=>existing.slice();ctx.message_=id=>({...sample,id,timestamp:start*1000});
+ctx.Gmail={Users:{Messages:{list:(user,args)=>{
+  const page=Number(args.pageToken||0);assert.equal(args.maxResults,20);
+  return {messages:Array.from({length:20},(_,i)=>({id:'synthetic-'+(page*20+i)})),nextPageToken:page<2?String(page+1):undefined};
+}}}};
+const previews=[];let next=null,total=0;
+do{const page=ctx.previewApplications({startSeconds:start,endSeconds:end},next);previews.push(page);total+=page.results.length;next=page.nextCursor;}while(next);
+assert.equal(total,60);
+let writes=0;ctx.notion_=(path,method,body)=>{assert.equal(path,'pages');writes++;existing.push(a);return {id:'created',url:'https://example.com/result'};};
+for(const page of previews)ctx.importApplications(page.ticket);
+assert.equal(writes,1,'cross-page duplicates must only create one record');
+const stale=ctx.previewApplications({},null);saved.NOTION_DATA_SOURCE_ID=other;
+assert.throws(()=>ctx.importApplications(stale.ticket));saved.NOTION_DATA_SOURCE_ID=source;
+assert.throws(()=>ctx.importApplications('missing-ticket'));
+// Generated entrypoint serves exactly the maintained UI, no external file needed.
+let served;
+const single={HtmlService:{createHtmlOutput:html=>{served=html;return {setTitle:()=>true};}}};
+vm.createContext(single);vm.runInContext(fs.readFileSync('SingleFile.gs','utf8'),single);single.doGet();assert.equal(served,html);
+assert(!html.includes('id="limit"'));
+new vm.Script(html.match(/<script>([\s\S]*?)<\/script>/)[1]);
+console.log('Setup validation, multi-source selection, 60-message pagination, cross-page dedupe, stale tickets and single-file packaging passed.');
+// Exercise browser orchestration with a small DOM/RPC substitute.
+(async()=>{
+  const elements=new Map();
+  const element=()=>({value:'',disabled:false,hidden:false,textContent:'',children:[],checkValidity:()=>true,append(x){this.children.push(x);},replaceChildren(){this.children=[];}});
+  const get=id=>{if(!elements.has(id))elements.set(id,element());return elements.get(id);};
+  const calls=[];let previewPage=0,imports=0;
+  const rpc={connectionStatus:()=>({ready:true}),previewApplications:(range,cursor)=>{calls.push(cursor);const n=previewPage++;return {ticket:'ticket'+n,nextCursor:n<2?'page'+(n+1):null,results:[{...a,state:'new'}]};},importApplications:()=>{imports++;return {results:[{...a,state:'created'}]};}};
+  const runner=(ok,fail)=>new Proxy({}, {get:(_,key)=>key==='withSuccessHandler'?fn=>runner(fn,fail):key==='withFailureHandler'?fn=>runner(ok,fn):(...args)=>{queueMicrotask(()=>{try{ok(rpc[key](...args));}catch(e){fail(e);}});}});
+  const browser={document:{getElementById:get,createElement:element},google:{script:{run:runner()}},Intl,Date,Promise,Set};vm.createContext(browser);
+  vm.runInContext(html.match(/<script>([\s\S]*?)<\/script>/)[1],browser);
+  await get('preview').onclick();assert.equal(calls.length,3);assert.equal(get('import').disabled,false);
+  await get('import').onclick();assert.equal(imports,3);assert.equal(get('import').disabled,true);
+  previewPage=0;await get('preview').onclick();get('startDate').onchange();assert.equal(get('import').disabled,true);
+  rpc.previewApplications=()=>{throw Error('synthetic preview failure');};await get('preview').onclick();assert.equal(get('import').disabled,true);assert.equal(get('preview').disabled,false);
+  console.log('Client automatic paging, queued import, changed-filter invalidation and failure recovery passed.');
+})().catch(e=>{console.error(e);process.exitCode=1;});

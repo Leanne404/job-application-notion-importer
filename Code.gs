@@ -5,18 +5,18 @@ function dataSource_() {
   }
   return id;
 }
-const MAIL_QUERY = 'from:jobs-noreply@linkedin.com {subject:"您的應徵資料已傳送到" subject:"您的申请已发送至" subject:"您的申请已发送给" subject:"您的申请资料已发送至" subject:"您的申请资料已发送给" subject:"Your application was sent to" subject:"Your application has been sent to"}';
+const MAIL_QUERY = 'from:jobs-noreply@linkedin.com {subject:"您的應徵資料已傳送到" subject:"Your application was sent to" subject:"Your application has been sent to"}';
 function doGet() {
   return HtmlService.createHtmlOutputFromFile('Index').setTitle('申請紀錄小幫手');
 }
 function norm_(s) { return String(s || '').normalize('NFKC').toLowerCase().replace(/\s+/g,' ').trim(); }
 function ids_(s) { return [...String(s || '').matchAll(/https?:\/\/(?:[\w-]+\.)?linkedin\.com\/(?:comm\/)?jobs\/view\/(\d+)/gi)].map(m=>m[1]); }
 function confirmationCompany_(line) {
-  const m=String(line||'').trim().match(/^(?:您的應徵資料已傳送到|您的申请(?:资料)?已发送(?:至|给)|Your application (?:was|has been) sent to)\s*(.+)$/i);
+  const m=String(line||'').trim().match(/^(?:您的應徵資料已傳送到|Your application (?:was|has been) sent to)\s*(.+)$/i);
   return m ? m[1].trim() : null;
 }
 function applicationDate_(main) {
-  let m=main.match(/(?:應徵日期|申请日期)\s*[：:]\s*(\d{4})年(\d{1,2})月(\d{1,2})日/);
+  let m=main.match(/(?:應徵日期)\s*[：:]\s*(\d{4})年(\d{1,2})月(\d{1,2})日/);
   let y,month,day;
   if(m) { [,y,month,day]=m; }
   else {
@@ -38,14 +38,14 @@ function applicationDate_(main) {
 }
 function parse_(m) {
   if (!/(?:^|[<\s])jobs-noreply@linkedin\.com(?:>|$)/i.test(m.sender)) throw Error('不是 LinkedIn 確認信寄件者');
-  if (!/(?:您的應徵資料已傳送到|您的申请(?:资料)?已发送(?:至|给)|Your application (?:was|has been) sent to)/i.test(m.subject)) throw Error('不是支援的申請確認信');
+  if (!/(?:您的應徵資料已傳送到|Your application (?:was|has been) sent to)/i.test(m.subject)) throw Error('不是支援的申請確認信');
   const lines=String(m.body||'').split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
   const header=lines.findIndex(line=>confirmationCompany_(line));
   if(header<0) throw Error('信件格式不同，請手動確認');
   const company=confirmationCompany_(lines[header]),position=lines[header+1];
   if(!position || norm_(company)!==norm_(lines[header+2])) throw Error('公司資訊不一致');
   // Bound the card at its explicit application-date line, before recommendations.
-  const dateIndex=lines.findIndex((line,i)=>i>header+2 && /^(?:應徵日期|申请日期|Date applied|Applied on|Application date)\s*[:：]?/i.test(line));
+  const dateIndex=lines.findIndex((line,i)=>i>header+2 && /^(?:應徵日期|Date applied|Applied on|Application date)\s*[:：]?/i.test(line));
   if(dateIndex<0) throw Error('缺少明確申請日期，請手動確認');
   const main=lines.slice(header,dateIndex+1).join('\n');
   const ids=[...new Set(ids_(main))];
@@ -75,22 +75,53 @@ function token_() {
   if(!t) throw Error('請先在專案設定的指令碼屬性新增 NOTION_TOKEN，並將 Job Tracker 連接至該 Notion integration。');
   return t;
 }
-function notion_(path, method, body) {
+function notion_(path, method, body, secret) {
   // Never retry page creation: an ambiguous timeout may have already committed.
   Utilities.sleep(350);
   const response=UrlFetchApp.fetch('https://api.notion.com/v1/'+path,{
-    method:method||'get',headers:{Authorization:'Bearer '+token_(),'Notion-Version':'2025-09-03'},
+    method:method||'get',headers:{Authorization:'Bearer '+(secret||token_()),'Notion-Version':'2025-09-03'},
     contentType:'application/json',payload:body===undefined?undefined:JSON.stringify(body),muteHttpExceptions:true
   });
   if(response.getResponseCode()>=300) throw Error('Notion 連線失敗（'+response.getResponseCode()+'）。請檢查授權；若剛才正在匯入，重新預覽會核對已完成項目。');
   return JSON.parse(response.getContentText());
 }
-function checkSchema_() {
-  const p=notion_('data_sources/'+dataSource_()).properties;
+function validateSchema_(p) {
   for(const [name,type] of Object.entries({Company:'title',Position:'rich_text',Status:'select',Website:'rich_text','Apply Date':'date'})) {
     if(!p[name] || p[name].type!==type) throw Error('Notion 欄位 '+name+' 類型不符，請檢查資料庫。');
   }
   if(!p.Status.select.options.some(o=>o.name==='Applied')) throw Error('Status 缺少 Applied 選項');
+}
+function checkSchema_() { validateSchema_(notion_('data_sources/'+dataSource_()).properties); }
+function connectionStatus() {
+  const p=PropertiesService.getScriptProperties();
+  return {ready:!!(p.getProperty('NOTION_TOKEN') && p.getProperty('NOTION_DATA_SOURCE_ID'))};
+}
+function databaseId_(value) {
+  const input=String(value||'').trim();
+  if (/^[a-f0-9-]{32,36}$/i.test(input)) return input.replace(/-/g,'');
+  if (!/^https:\/\/(?:www\.|app\.)?notion\.(?:so|com)\//i.test(input)) throw Error('請貼上 Notion 原始資料庫的連結');
+  const path=input.split('?')[0].split('#')[0];
+  const match=path.match(/([a-f0-9]{32}|[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})\/?$/i);
+  if(!match) throw Error('無法從連結辨識資料庫，請先將表格開啟為整頁再複製連結');
+  return match[1].replace(/-/g,'');
+}
+function saveConnection(secret, databaseLink, selectedSource) {
+  secret=String(secret||'').trim();
+  if(!/^(?:ntn_|secret_)[A-Za-z0-9_-]+$/.test(secret)) throw Error('請貼上有效的 Notion 連線密鑰');
+  const lock=LockService.getScriptLock();
+  if(!lock.tryLock(1000)) throw Error('正在處理其他操作，請稍後再試');
+  try {
+    const database=notion_('databases/'+databaseId_(databaseLink),'get',undefined,secret);
+    const sources=database.data_sources||[];
+    if(!sources.length) throw Error('此連結沒有資料來源，請使用原始資料庫連結');
+    if(sources.length>1 && !selectedSource) return {ready:false,sources:sources.map(x=>({id:x.id,name:x.name}))};
+    const source=selectedSource?sources.find(x=>x.id===selectedSource):sources[0];
+    if(!source) throw Error('請選擇這個資料庫中的資料來源');
+    validateSchema_(notion_('data_sources/'+source.id,'get',undefined,secret).properties);
+    // Save only after both access and schema validation pass; never return the secret.
+    PropertiesService.getScriptProperties().setProperties({NOTION_TOKEN:secret,NOTION_DATA_SOURCE_ID:source.id});
+    return {ready:true};
+  } finally {lock.releaseLock();}
 }
 function text_(p, links) {
   if(!p) return '';
@@ -132,11 +163,10 @@ function searchQuery_(range) {
   return MAIL_QUERY + (start != null ? ' after:' + (start - 1) : '') +
     (end != null ? ' before:' + end : '');
 }
-function previewApplications(limit, range) {
-  limit=Number(limit); if(![5,10,25,50].includes(limit)) throw Error('請選擇有效筆數');
+function previewApplications(range, cursor) {
   const query=searchQuery_(range);
   checkSchema_();
-  const response=Gmail.Users.Messages.list('me',{q:query,maxResults:limit});
+  const response=Gmail.Users.Messages.list('me',{q:query,maxResults:20,...(cursor?{pageToken:String(cursor)}:{})});
   const rows=existing_(), results=[];
   for(const ref of response.messages||[]) {
     try {
@@ -149,8 +179,8 @@ function previewApplications(limit, range) {
   }
   // Persist only IDs server-side. Import re-reads original messages and Notion.
   const ticket=Utilities.getUuid();
-  CacheService.getUserCache().put('preview:'+ticket,JSON.stringify(results.filter(r=>r.state==='new').map(r=>r.messageId)),1800);
-  return {ticket,results,hasMore:!!response.nextPageToken};
+  CacheService.getUserCache().put('preview:'+ticket,JSON.stringify({source:dataSource_(),ids:results.filter(r=>r.state==='new').map(r=>r.messageId)}),1800);
+  return {ticket,results,nextCursor:response.nextPageToken||null};
 }
 function importApplications(ticket) {
   const lock=LockService.getScriptLock();
@@ -159,15 +189,17 @@ function importApplications(ticket) {
     const cache=CacheService.getUserCache(), key='preview:'+String(ticket), raw=cache.get(key);
     if(!raw) throw Error('預覽已過期或已使用，請重新預覽');
     cache.remove(key);
+    const preview=JSON.parse(raw);
+    if(preview.source!==dataSource_()) throw Error('Notion 連線已變更，請重新預覽');
     checkSchema_();
     const rows=existing_(), results=[];
-    for(const id of JSON.parse(raw)) {
+    for(const id of preview.ids) {
       let a;
       try {
         a=parse_(message_(id)); const d=decision_(a,rows);
         if(d.state!=='new') { results.push(Object.assign({},a,d)); continue; }
         // A pending marker survives ambiguous network failures and prevents blind retries.
-        const ledger=PropertiesService.getScriptProperties(), lk='job:'+ids_(a.Website)[0];
+        const ledger=PropertiesService.getScriptProperties(), lk='job:'+dataSource_()+':'+ids_(a.Website)[0];
         const old=ledger.getProperty(lk);
         if(old) { results.push(Object.assign({},a,{state:'review',reason:'先前有匯入紀錄或未確認結果，請在 Notion 核對'})); continue; }
         const rt=s=>[{type:'text',text:{content:s}}];

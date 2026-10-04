@@ -2,11 +2,13 @@
 /*
 !/.gitignore
 !/README.md
+!/SingleFile.gs
 !/Code.gs
 !/Index.html
 !/appsscript.json
 !/scripts/
 /scripts/*
+!/scripts/build-single.py
 !/scripts/check-private.py
 !/scripts/pre-commit
 !/scripts/pre-push

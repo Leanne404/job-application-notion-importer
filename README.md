@@ -1,108 +1,110 @@
 # LinkedIn → Notion 申請紀錄小幫手
 
-在自己的 Google Apps Script 帳號部署，用按鈕把 Gmail 中的 LinkedIn 申請確認信寫入 Notion。先預覽、檢查重複，再新增資料。
+**平常只要：選日期 → 預覽 → 匯入。** 支援繁體中文與英文 LinkedIn 申請已送出確認信，新增前會檢查 Notion 是否已有相同申請。
 
-## 功能
+沒有筆數選單，也沒有只查前 50 封的總數限制。工具會自動分頁搜尋你選的日期範圍，再分批匯入；過程中請保持頁面開啟。仍受 Google／Notion 的時間與配額限制，遇到錯誤會明確停止，可重新預覽核對已完成項目。
 
-- **依開始／結束收信日期搜尋中英文 LinkedIn 申請確認信**（繁體中文、簡體中文、英文）。
-- 每次預覽上限可選 5、10、25 或 50 封；這是單次筆數上限，不是日期範圍。
-- 寫入 Company、Position、Status、Website、Apply Date。
-- 優先以 LinkedIn 職缺編號去重；缺少編號時以公司、職位與日期比對。
-- 模糊比對標為待確認；已存在的申請及其狀態保持原樣。
-- 匯入前重新核對，使用執行鎖、一次性預覽及未確認寫入標記避免重複操作。
-- Gmail 權限為唯讀。無需 OpenAI、ChatGPT 或 Codex API。
+## 最簡單的安裝方式
 
-## 開始前準備
+你只需自己的 Google 帳號、Notion 帳號。**不用安裝 Python／Node、不用終端機，也不需要 OpenAI／ChatGPT／Codex 金鑰。** 下方步驟只做一次。
 
-你需要自己的 Google／Gmail 帳號、Notion 工作區，以及可以編輯的 Notion 資料庫。每位使用者都要在自己的帳號部署和授權。GitHub 上的程式不會替你連接帳號，也不包含任何人的金鑰。
+Google 和 Notion 是兩個不同服務，因此第一次仍需親自授權。Gmail 用 Google 的登入授權；Notion 需要建立一個私人連線並取得密鑰。此版本沒有公開 OAuth 服務，無法免除這一步。
 
-此工具不依賴特定模板。可以建立空白 Notion 資料庫，或從下方「第三方模板與授權」的原始連結取得作者提供的模板，再設定欄位。
+### 第一步：把工具放進自己的 Google 帳號
 
-## 1. 準備 Notion 資料庫
+1. 用**收到 LinkedIn 確認信的 Google 帳號**開啟 [Google Apps Script](https://script.google.com/home/start)，按 **新增專案 / New project**。
+2. 將專案改名為「申請紀錄小幫手」。
+3. 在 GitHub 開啟 [SingleFile.gs](SingleFile.gs)，按 **Raw**，複製全部文字。
+4. 回到 Apps Script，選左側 `Code.gs`，刪掉預設的 `myFunction`，貼上剛才的全部文字並儲存。**不用另外建立 Index.html，也不要同時貼入其他 .gs 檔。**
+5. 點左側齒輪 **專案設定 / Project Settings**，勾選「在編輯器中顯示 appsscript.json 資訊清單檔案」。
+6. 回編輯器，點 `appsscript.json`，用 GitHub 的 [appsscript.json](appsscript.json) 全部內容取代並儲存。這份設定讓 Gmail 授權保持唯讀。
+7. 確認左側 **服務 / Services** 有 **Gmail API**。若沒有，按 `+` → Gmail API → v1 → 新增，識別符保持 `Gmail`。
 
-打開要存求職紀錄的**原始資料庫**，依下表設定欄位名稱及類型（包含大小寫與空白）：
+你只需要貼上兩個檔案：整合程式與權限設定。README 中的其他程式檔是給開發者維護用的。
 
-| 欄位 | Notion 類型 | 寫入內容 |
+### 第二步：部署成自己可開啟的網頁
+
+1. 按右上角 **部署 / Deploy → 新增部署 / New deployment**。
+2. 在「選取類型」旁的齒輪選 **網頁應用程式 / Web app**。
+3. **執行身分 / Execute as** 選 **我 / Me**。
+4. **誰可以存取 / Who has access** 選 **僅限自己 / Only myself**。
+5. 按 **部署**。若要求授權，按 **授權存取 / Authorize access**，選收信的 Google 帳號，確認 Gmail 唯讀與外部連線權限後完成授權。
+6. 複製部署結果中的 **網頁應用程式網址 / Web app URL**，開啟並加入書籤。之後用這個網址操作。
+
+若 Google 顯示未驗證提示，先確認是自己建立的專案及正確程式；來源不明的應用不要授權。組織帳號若被管理政策阻擋，需由管理員處理。使用自訂 Cloud 專案時也需在該專案啟用 Gmail API。
+
+### 第三步：讓 Notion 允許這個工具存取資料庫
+
+1. 在自己的 Notion 建立空白表格，或從本文下方原作者連結取得模板。
+2. 確認表格有以下五個欄位，名稱、大小寫及類型需相符：
+
+| 欄位 | 類型 | 用途 |
 |---|---|---|
-| Company | 標題 / Title | 公司名稱；可將原本的 Name 欄改名 |
-| Position | 文字 / Text | 職位名稱 |
-| Status | 選取 / Select | 先新增 `Applied` 選項 |
-| Website | 文字 / Text | 可點擊的 LinkedIn 職缺連結 |
-| Apply Date | 日期 / Date | 信件明示的應徵日期 |
+| Company | 標題 / Title | 公司名稱（可將 Name 改名） |
+| Position | 文字 / Text | 職位 |
+| Status | 選取 / Select | 需包含 `Applied` 選項 |
+| Website | 文字 / Text | 可點擊的職缺連結 |
+| Apply Date | 日期 / Date | 應徵日期 |
 
-`Status` 是 Select，不是 Notion 的 Status 類型；`Website` 是文字，不是 URL 類型。若既有模板的 `Position` 是網址，請先在自己的副本改為文字。修改現有欄位類型前先檢查內容；工具不會替你修改欄位。
+`Status` 不是 Notion 的 Status 類型；Position 和 Website 都使用文字類型。修改模板副本的欄位前請先檢查內容，工具不會自行改欄位。
 
-若使用 Job Finder 頁面裡的 Job Tracker 表格，請連接實際存放紀錄的 Job Tracker 資料來源。連結檢視只是顯示原資料來源，不能只授權放置檢視的外層頁面。[Notion 資料庫與資料來源說明](https://developers.notion.com/guides/data-apis/working-with-databases)
+3. 開啟 [Notion integrations](https://www.notion.so/profile/integrations)，建立 **Internal integration / Internal connection**，名稱可填「申請紀錄小幫手」，選擇資料庫所在的工作區。
+4. 能力設定開啟 **Read content（讀取）** 和 **Insert content（新增）**，複製 **Internal Integration Secret**。這就是下個步驟要貼的「Notion 連線密鑰」。
+5. 回到 Notion 的**原始資料庫**，右上角 `…` → **Connections / 連線** → 加入剛建立的連線。只建立連線但沒有授權資料庫，工具仍無法使用。
+6. 將原始表格 **開啟為整頁 / Open as full page**，用 `…` → **複製連結 / Copy link**。
 
-## 2. 連接自己的 Notion
+若使用 Job Finder 裡的 Job Tracker，請取得真正儲存紀錄的 Job Tracker 資料庫連結；不要複製 Job Finder 外層頁面或一個職缺列的連結。連結檢視應開啟其原始資料庫。
 
-1. 打開 [Notion integrations](https://www.notion.so/profile/integrations)，建立新的 **Internal integration / Internal connection**（名稱可自訂）。選擇資料庫所在的工作區。
-2. 在能力設定啟用 **Read content** 和 **Insert content**。此工具只讀取既有資料並新增頁面，不需要更新內容、留言或讀取使用者 email 的能力。
-3. 複製 **Internal Integration Secret**，稍後填入 Apps Script 的指令碼屬性。不要貼進 GitHub、程式或 README。
-4. 回到目標原始資料庫，打開右上角 `…` → **Connections / 連線** → 新增剛才建立的 integration。選單也可能顯示 **Connect to**。若找不到，確認 integration 所在工作區，以及自己的資料庫存取權限。
-5. 在資料庫設定中開啟 **Manage data sources / 管理資料來源**，在目標資料來源旁的選單選 **Copy data source ID**。稍後存到 `NOTION_DATA_SOURCE_ID`。
+### 第四步：在工具畫面完成連接
 
-要複製的是 **data source ID**，不是 Job Finder 的頁面 ID、database ID，也不是網址 `v=` 後面的 view ID。若有多個資料來源，選包含上面五個欄位的那個。[官方取得 ID 說明](https://developers.notion.com/guides/get-started/upgrade-guide-2025-09-03#step-1-add-a-discovery-step-to-fetch-and-store-the-data_source_id)
+1. 打開第二步保存的工具網址，展開 **首次設定／更換 Notion 連線**。
+2. 貼上 **Notion 連線密鑰**與**資料庫連結**，按 **連接 Notion**。
+3. 工具會自動找出資料來源並驗證欄位；若資料庫有多個來源，選擇對應表格後再按一次連接。
+4. 看到已連接後即可使用。不必找 data source ID，也不必進入指令碼屬性手動填設定。
 
-建立 integration 與授予資料庫存取權是兩個步驟；只拿到 secret，沒有連接資料庫，仍不能匯入。[Notion 官方入門](https://developers.notion.com/guides/get-started/quick-start)
+密鑰只透過自己的 Apps Script 傳送到 Notion 以驗證，驗證成功後保存在私人 Apps Script 專案設定；不會寫入 GitHub 或回傳到預覽結果。密鑰欄會清空。不要將專案分享給不應存取資料的人，也不要上傳設定畫面的截圖。
 
-## 3. 建立自己的 Google Apps Script 專案
+## 日常使用
 
-1. 使用**實際收到 LinkedIn 確認信的 Google 帳號**，打開 [Google Apps Script](https://script.google.com/home/start)，建立新專案。
-2. 將此儲存庫 `Code.gs` 的內容完整貼入編輯器中的同名檔案。
-3. 新增 HTML 檔，名稱輸入 `Index`，貼入 `Index.html`。Apps Script 會自動加上 `.html`。
-4. 進入左側 **專案設定 / Project Settings**，啟用「在編輯器中顯示 appsscript.json 資訊清單檔案」。
-5. 回編輯器，使用本儲存庫 `appsscript.json` 的內容取代原資訊清單，儲存。
-6. 左側 **服務 / Services** 應出現 **Gmail API v1**。若沒有，按 `+` 新增 Gmail API，識別符保持 `Gmail`。使用自訂 Google Cloud 專案時，也要在該 Cloud 專案啟用 Gmail API。[官方服務設定](https://developers.google.com/apps-script/advanced/gmail)
+1. 開啟書籤中的工具網址。
+2. 選擇開始／結束日期。包含兩端整天；留空代表不限該端，兩端留空會查所有符合條件的歷史確認信。
+3. 按 **檢查並預覽**，等待顯示「日期範圍搜尋完成」。工具會自動讀取後續頁，不需要挑筆數。
+4. 檢查結果：可新增會匯入，已存在會跳過，待確認請手動核對。
+5. 按 **匯入可新增項目**，等待完成。請保持頁面開啟；再次執行時仍會重新比對 Notion。
 
-本工具使用 Google 的授權流程讀取該帳號的 Gmail，**不需填 Gmail 密碼、App Password 或 Gmail API key**。資訊清單只申請 Gmail 唯讀與對外 API 請求權限；程式不會寄信、刪信或標示已讀。
+搜尋依**收信日期**與瀏覽器時區；Notion 的 Apply Date 仍採用信件內的應徵日期。預覽只讀資料，匯入才新增。既有申請的狀態不會被覆蓋。這是手動工具，沒有背景排程。
 
-## 4. 儲存私人連線設定
+## 已安裝舊版？這樣更新
 
-在 Apps Script **專案設定 → 指令碼屬性 / Script Properties → 新增屬性**，加入：
+1. 用新版 `SingleFile.gs` 完整取代 Apps Script 的 `Code.gs`。不要和原來的程式重複貼上。
+2. 使用新版 `appsscript.json`。舊的 `Index.html` 可保留，但整合版不會使用它。
+3. 按 **部署 → 管理部署 → 鉛筆編輯 → 版本選「新版本」→ 部署**。
+4. 重新整理原本工具網址。只按儲存不會更新正式部署。
 
-| 屬性名稱（原樣輸入） | 屬性值 |
-|---|---|
-| `NOTION_TOKEN` | 步驟 2 複製的 integration secret |
-| `NOTION_DATA_SOURCE_ID` | 步驟 2 複製的 data source ID |
-
-值直接貼上，不加引號、不加 `Bearer`，不放到原始碼。指令碼屬性留在自己的 Apps Script 專案，不會因為下載或推送此 GitHub 儲存庫而上傳。不過專案編輯者可以存取這些設定，因此請把專案保留給自己。
-
-## 5. 部署並授權 Gmail
-
-1. 按 **部署 / Deploy → 新增部署 / New deployment**，類型選 **網頁應用程式 / Web app**。
-2. **執行身分 / Execute as** 選自己。
-3. **誰可以存取 / Who has access** 選 **僅限自己 / Only myself**。
-4. 按部署；出現授權要求時，選擇收到申請信的 Google 帳號，檢查 Gmail 唯讀及外部服務連線權限後完成授權。若組織政策阻擋，請由管理員處理。
-5. 保存產生的網頁應用程式網址，之後用同一帳號開啟即可操作。
-
-若出現未驗證應用程式提示，先確認專案與部署確實是自己建立、程式內容正確；不要授權來源不明的專案。公開程式碼不需要把這個私人部署網址公開。
-
-更改程式後，到 **部署 → 管理部署 → 編輯 → 新版本 → 部署**，讓既有網址使用更新版本。僅儲存編輯器內容不會自動更新正式部署。[Google 網頁應用程式說明](https://developers.google.com/apps-script/guides/web)
-
-## 6. 第一次使用與日常匯入
-
-1. 打開自己的部署網址，選擇**開始日期、結束日期**，先選最多 **5 封確認信**。兩端均包含當天；可只填一端，兩端留空則不限日期。日期依瀏覽器所在時區計算，畫面會顯示時區。
-2. 按 **檢查並預覽**。工具會讀取 Gmail、查詢 Notion，顯示五個欄位及判定結果。
-3. `可新增` 代表尚未找到相符申請；`已存在` 會跳過；`待確認` 請手動核對。
-4. 檢查預覽後，按 **匯入可新增項目**。此時工具會重新核對 Notion 才新增。
-5. 到 Notion 檢查新增紀錄。再跑一次預覽時，同一職缺應顯示已存在。
-
-搜尋的是 Gmail 收到信件的日期，不是信件內的應徵日期；寫入 Notion 的 Apply Date 仍使用信件中的日期。結束日會轉成下一天零時作為不包含的上界，因此包含結束當天整天（含夏令時間變換）。改動搜尋條件後必須重新預覽。
-
-如果範圍內信件多於所選筆數，畫面會提醒還有更多信件；可增加到 50 封，或分成較短日期範圍處理。預覽不會新增紀錄。這是手動工具，沒有自動排程；需要時再次開啟網址即可。
+原本存在的 Notion 指令碼屬性仍可沿用，不需要重新連接。
 
 ## 常見問題
 
-| 情況 | 處理方式 |
+| 問題 | 處理方式 |
 |---|---|
-| `Gmail is not defined` | 檢查服務是否加入 Gmail API v1，以及是否更新部署版本。 |
-| 找不到確認信 | 確認部署者是收信帳號；在 Gmail 搜尋 `from:jobs-noreply@linkedin.com`，確認主旨是申請已送出通知。支援格式見下方。 |
-| Notion 401 | secret 可能無效或已撤銷，更新 `NOTION_TOKEN`。 |
-| Notion 403／404 | 檢查 integration 的能力、原始資料庫 Connections、工作區與 data source ID。 |
-| 欄位類型不符 | 逐一依步驟 1 檢查，尤其是 Position、Website 與 Status。 |
-| 預覽已過期或已使用 | 重新按「檢查並預覽」；預覽保留 30 分鐘且只使用一次。 |
-| 匯入未完成或 pending | 先查看 Notion 是否已新增，再按下方錯誤恢復說明處理；不要盲目刪除防重複標記。 |
+| Gmail is not defined | 在服務加入 Gmail API v1，並部署新版本。 |
+| 沒有信件 | 確認部署使用收信帳號、日期正確，且主旨是繁中或英文的申請已送出確認信。 |
+| Notion 401 | 密鑰無效或已撤銷，重新連接。 |
+| Notion 403／404 | 檢查資料庫的 Connections、工作區與原始資料庫連結。 |
+| 欄位類型不符 | 依第三步表格修正自己的資料庫欄位。 |
+| 預覽過期 | 重新預覽；分批預覽憑證約 30 分鐘有效，Google 也可能提早清除快取。 |
+| 長時間處理或配額錯誤 | 縮小日期範圍後重新預覽；已存在的申請會跳過。 |
+| 換資料庫後無法匯入舊預覽 | 重新預覽，避免誤寫到不同的資料庫。 |
+
+## 支援範圍與錯誤恢復
+
+- 只支援繁體中文「您的應徵資料已傳送到」與英文「Your application was sent to／Your application has been sent to」確認信；不搜尋簡體中文。
+- 英文日期支援 Date applied、Applied on、Application date 標籤，以及月份英文名稱或 ISO 日期。含糊數字日期不猜測，列為待確認。
+- 繁中先前曾以實際信件驗證；英文以虛構樣本測試。其他主旨、純 HTML 或不同排版可能不支援。
+- 相同 LinkedIn 職缺編號優先判定重複，另比對公司、職位與日期。跨批次重複會在匯入時再次檢查。
+- 一批失敗會停止後續匯入，畫面保留已完成結果。重新預覽可核對進度；工具不承諾無限量或自動背景續傳。
+- 不明確的寫入錯誤保留 pending 標記，不直接重試。先到 Notion 確認；只有確定未建立時，才在指令碼屬性刪除對應 `job:資料來源:職缺編號` 標記。
+- 執行鎖僅涵蓋本 Apps Script 專案，其他獨立程式同時新增仍可能競態。
 
 ## 第三方模板與授權
 
@@ -116,39 +118,24 @@
 
 本專案的做法是公開獨立程式與原始模板連結，讓使用者各自向作者取得模板。如果要把模板本身或改版副本放上 GitHub，應先取得作者明確的再散布許可。作者聯絡入口在模板頁面的 **Email the creator**。這是依公開資料作的實務判斷，並非作者的授權確認。
 
-## 隱私與版本管理
+## 隱私與開發者說明
 
-本儲存庫只存程式、匿名測試與說明。個人帳號、資料來源 ID、API 金鑰、OAuth token、部署 ID、真實郵件、求職紀錄、截圖和操作日誌不得提交。
+儲存庫不包含帳號、Notion ID、密鑰、真實信件、求職資料或私人截圖。`.gitignore` 預設拒絕新檔案，只允許審查過的程式及說明；已追蹤檔案仍需檢查差異。
 
-`.gitignore` 使用預設排除、明確允許檔案的方式，並額外排除 macOS `.DS_Store`、環境檔、憑證、Codex/OpenAI 設定及各種輸出檔。新增程式檔案時，先檢查內容再加入允許清單。不要用 `git add -f`。
-
-`.gitignore` 不會移除已追蹤檔案，也無法阻止把秘密寫入程式。初次複製儲存庫後，可安裝檢查 hooks：
+開發者修改 `Code.gs`、`Index.html` 後，重新產生整合版並測試：
 
 ```sh
-git config core.hooksPath scripts
-chmod +x scripts/pre-commit scripts/pre-push
-python3 scripts/check-private.py
+python3 scripts/build-single.py
 node tests/core.test.cjs
+git config core.hooksPath scripts
+python3 scripts/check-private.py
 ```
 
-commit 檢查暫存區；push 檢查所有可到達的提交內容。掃描遇到疑似金鑰、帳號、私人 URL 或未核准檔案會停止，但任何自動掃描都不能保證辨認所有私人資訊。仍應檢查提交差異。不會掃描你的電腦帳號資料夾，也不需提供其他服務的金鑰。
-
-## 限制與錯誤恢復
-
-- 支援繁體中文「您的應徵資料已傳送到」、簡體中文「您的申请已发送至／给」（可含「资料」）、英文「Your application was sent to／Your application has been sent to」確認信。
-- 英文日期支援 `Date applied`、`Applied on`、`Application date` 標籤，以及 `January 2, 2020`、`2 January 2020`、`2020-01-02` 等格式。含糊數字日期（如 `01/02/2020`）不猜測，列為待確認。
-- 繁中格式先前曾以實際信件驗證；英文與簡中目前以虛構信件測試，尚未以使用者帳號的實際樣本驗證。其他主旨、純 HTML 或不同排版仍可能不支援。符合搜尋但無法解析的信件會顯示待確認，不會直接匯入；不符合主旨的信件不會出現在搜尋結果。
-- 推薦職缺、履歷被查看、申請進度及拒絕通知不會當成新申請。
-- 每次讀取指定日期範圍內最近的指定筆數，不會自動跳過已存在項目去讀更早的歷史信件。
-- 預覽 30 分鐘到期。任何部分失敗都應先重新預覽核對。
-- 不明確的網路錯誤不會自動重試新增。若指令碼屬性中有 `job:職缺編號` 的 pending 記錄，先到 Notion 檢查；只有確認未新增時才刪除該標記。
-- 鎖僅涵蓋同一 Apps Script 專案，無法防止其他獨立程式同時新增。
-- 測試使用虛構資料；Google 授權及實際部署須在自己的帳號完成。
+提交／推送檢查會掃描已追蹤內容與歷史，不會掃描電腦帳號資料夾。自動掃描不是完整隱私保證，提交前仍須審查內容。`SingleFile.gs` 是產生的完整程式；部署者只需使用該檔。
 
 ## 官方文件
 
-- [Apps Script Gmail API](https://developers.google.com/apps-script/advanced/gmail)
-- [Apps Script 網頁應用程式](https://developers.google.com/apps-script/guides/web)
-- [Notion 資料來源查詢](https://developers.notion.com/reference/query-a-data-source)
-
-- [Gmail 日期搜尋與時區](https://developers.google.com/workspace/gmail/api/guides/filtering)
+- [Google 網頁部署](https://developers.google.com/apps-script/guides/web)
+- [Google 資訊清單設定](https://developers.google.com/apps-script/guides/manifest)
+- [Gmail API 服務](https://developers.google.com/apps-script/advanced/gmail)
+- [Notion 授權](https://developers.notion.com/guides/get-started/authorization)
