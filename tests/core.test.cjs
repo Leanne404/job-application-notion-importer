@@ -87,7 +87,7 @@ ctx.Gmail={Users:{Messages:{list:(user,args)=>{
 const previews=[];let next=null,total=0;
 do{const page=ctx.previewApplications({startSeconds:start,endSeconds:end},next);previews.push(page);total+=page.results.length;next=page.nextCursor;}while(next);
 assert.equal(total,60);
-let writes=0;ctx.notion_=(path,method,body)=>{assert.equal(path,'pages');writes++;existing.push(a);return {id:'created',url:'https://example.com/result'};};
+let writes=0;ctx.notion_=(path,method,body)=>{if(String(path).includes('/templates'))return{templates:[],has_more:false};assert.equal(path,'pages');writes++;existing.push(a);return {id:'created',url:'https://example.com/result'};};
 for(const page of previews)ctx.importApplications(page.ticket);
 assert.equal(writes,1,'cross-page duplicates must only create one record');
 const stale=ctx.previewApplications({},null);saved.NOTION_DATA_SOURCE_ID=other;
@@ -153,6 +153,28 @@ assert.deepEqual(manifest.oauthScopes.slice().sort(),[
 ].sort());
 assert(!/innerHTML\s*=|insertAdjacentHTML\s*\(/.test(html));
 console.log('Sender mailbox, redirect refusal, read-only scopes and private deployment defaults passed.');
+const emojiIcon=ctx.writableIcon_({type:'emoji',emoji:'💼'});
+assert.equal(emojiIcon.type,'emoji');assert.equal(emojiIcon.emoji,'💼');
+const nativeIcon=ctx.writableIcon_({type:'icon',icon:{name:'briefcase',color:'brown',extra:true}});
+assert.equal(nativeIcon.type,'icon');assert.equal(nativeIcon.icon.name,'briefcase');assert.equal(nativeIcon.icon.color,'brown');
+assert.deepEqual(Object.keys(nativeIcon.icon).sort(),['color','name']);
+assert.equal(ctx.writableIcon_({type:'file',file:{url:'https://example.com/icon'}}),null);
+assert.equal(ctx.writableIcon_({type:'external',external:{url:'http://example.com/icon'}}),null);
+assert.equal(ctx.writableIcon_(null),null);
+const iconCalls=[];
+ctx.notion_=(path)=>{
+  iconCalls.push(path);
+  if(path.includes('/templates?start_cursor=next')) return {templates:[{id:'template-page',is_default:true},{id:'other-template',is_default:false}],has_more:false};
+  if(path.includes('/templates')) return {templates:[{id:'ignored',is_default:false}],has_more:true,next_cursor:'next'};
+  if(path==='pages/template-page') return {icon:{type:'emoji',emoji:'💼'}};
+  throw Error('unexpected '+path);
+};
+const copied=ctx.defaultPageIcon_();
+assert.equal(copied.type,'emoji');assert.equal(copied.emoji,'💼');
+assert.deepEqual(iconCalls,['data_sources/'+source+'/templates','data_sources/'+source+'/templates?start_cursor=next','pages/template-page']);
+ctx.notion_=()=>{throw Error('templates unavailable');};
+assert.equal(ctx.defaultPageIcon_(),null);
+console.log('Default template icons are copied, and unavailable templates leave the page unchanged.');
 
 // Apps Script hands Gmail body.data over as bytes. Decoding those bytes as base64 throws "Could not decode string."
 const plain='您的應徵資料已傳送到Example Company\nSoftware Engineer';

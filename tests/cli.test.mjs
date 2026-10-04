@@ -21,7 +21,7 @@ function email(id, job = '123', chinese = false, date = '2020-01-02') {
   const body = `${subject}\nSoftware Engineer\nExample Company\nhttps://www.linkedin.com/jobs/view/${job}/\n${chinese ? '應徵日期：2020年1月2日' : `Date applied: ${date}`}`;
   return { id, internalDate: String(new Date(2020, 0, 2, 12).getTime()), payload: { headers: [{ name: 'From', value: 'jobs-noreply@linkedin.com' }, { name: 'Subject', value: subject }], mimeType: 'text/plain', body: { data: Buffer.from(body).toString('base64url') } } };
 }
-function fixture({ failCreate = false, repeated = false } = {}) {
+function fixture({ failCreate = false, repeated = false, icon = null } = {}) {
   const store = memory(), pages = [], created = [], messages = { one: email('one'), two: email('two', '123', true), three: email('three', '456') };
   const gmail = async route => {
     if (route.startsWith('messages/')) return messages[route.split('/')[1].split('?')[0]];
@@ -30,8 +30,12 @@ function fixture({ failCreate = false, repeated = false } = {}) {
   };
   const notion = async (route, method, body) => {
     if (route === `data_sources/${source}`) return { properties: schema };
+    if (route.startsWith(`data_sources/${source}/templates`)) return { templates: icon ? [{ id: 'template', name: 'Application', is_default: true }] : [], has_more: false };
+    if (route === 'pages/template') return { icon };
     if (route.endsWith('/query')) return { results: pages, has_more: false };
     assert.equal(route, 'pages'); assert.equal(method, 'POST');
+    if (icon) { assert.equal(body.icon.type, 'emoji'); assert.equal(body.icon.emoji, icon.emoji); assert.equal('extra' in body.icon, false); }
+    else assert.equal(body.icon, undefined);
     assert.deepEqual(Object.keys(body.properties).sort(), ['Apply Date', 'Company', 'Position', 'Status', 'Website']);
     assert.equal(body.parent.data_source_id, source);
     created.push(body); pages.push({ properties: Object.fromEntries(Object.entries(body.properties).map(([key, value]) => [key, { ...value, type: Object.keys(value)[0] }])) });
@@ -195,4 +199,12 @@ test('Gmail 401 refreshes once; revoked login reports the recovery command', asy
   store.write('google.json', { refresh_token: 'example', expires_at: 0 });
   transport.request = async () => { throw Object.assign(Error('private remote detail'), { status: 400 }); };
   await assert.rejects(gmailClient(store, transport)('messages'), /Run node cli.mjs setup/);
+});
+
+test('created pages copy the default template icon and ignore extra icon fields', async () => {
+  const { engine, created } = fixture({ icon: { type: 'emoji', emoji: '💼', extra: true } });
+  const range = dateRange('2020-01-02', '2020-01-02');
+  await engine.import(await engine.preview(range), range);
+  assert.equal(created.length, 2);
+  assert.ok(created.every(page => page.icon.emoji === '💼' && !('extra' in page.icon)));
 });
