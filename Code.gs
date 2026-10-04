@@ -144,7 +144,12 @@ function existing_() {
   return rows;
 }
 function body_(p) {
-  if(p.mimeType==='text/plain' && p.body && p.body.data) return Utilities.newBlob(Utilities.base64DecodeWebSafe(p.body.data)).getDataAsString('UTF-8');
+  if(p.mimeType==='text/plain' && p.body && p.body.data) {
+    const data=p.body.data;
+    // Gmail's HTTP API returns base64url text. Apps Script's advanced service already decoded that field into bytes.
+    const bytes=typeof data==='string'?Utilities.base64DecodeWebSafe(data):data;
+    return Utilities.newBlob(bytes).getDataAsString('UTF-8');
+  }
   return (p.parts||[]).map(body_).filter(Boolean).join('\n');
 }
 function message_(id) {

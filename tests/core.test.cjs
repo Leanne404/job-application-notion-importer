@@ -153,3 +153,25 @@ assert.deepEqual(manifest.oauthScopes.slice().sort(),[
 ].sort());
 assert(!/innerHTML\s*=|insertAdjacentHTML\s*\(/.test(html));
 console.log('Sender mailbox, redirect refusal, read-only scopes and private deployment defaults passed.');
+
+// Apps Script hands Gmail body.data over as bytes. Decoding those bytes as base64 throws "Could not decode string."
+const plain='您的應徵資料已傳送到Example Company\nSoftware Engineer';
+let base64Calls=0;
+ctx.Utilities={
+  base64DecodeWebSafe:value=>{
+    if(typeof value!=='string') throw Error('Could not decode string.');
+    base64Calls++;
+    return Buffer.from(value,'base64url');
+  },
+  newBlob:value=>({getDataAsString:()=>Buffer.from(value).toString('utf8')})
+};
+const encoded=Buffer.from(plain,'utf8').toString('base64url');
+assert.equal(ctx.body_({mimeType:'text/plain',body:{data:encoded}}),plain);
+assert.equal(base64Calls,1);
+const bytes=[...Buffer.from(plain,'utf8')];
+assert.equal(ctx.body_({mimeType:'multipart/alternative',parts:[
+  {mimeType:'text/html',body:{data:bytes}},
+  {mimeType:'text/plain',body:{data:bytes}}
+]}),plain);
+assert.equal(base64Calls,1,'Gmail bytes from Apps Script must not be decoded as base64 again');
+console.log('Gmail body decoding accepts both base64url text and Apps Script byte arrays.');
