@@ -10,7 +10,7 @@ The tool fills **Company, Position, Status, Website, and Apply Date**. It checks
 
 ### Choose how to run it
 
-| | Web app | Terminal |
+| | ⭐️Web app | Terminal |
 |---|---|---|
 | Where it runs | Your Google account, using Google Apps Script | Your own computer, using Node.js |
 | How you use it | Open a bookmarked URL and click buttons | Run a command |
@@ -42,7 +42,7 @@ Use your existing tracker or create a Notion database with these **exact names a
 
 You now have the two things either installation needs: **a Notion secret and a database link**. You can reuse them if you later switch methods.
 
-### Method 1: web app
+### Method 1: web app (⭐️Recommended)
 
 **You are putting a private copy of this tool in your Google account.** You need a browser, the Google account receiving the emails, and the Notion details above.
 
@@ -197,7 +197,7 @@ References: [Apps Script deployment](https://developers.google.com/apps-script/g
 
 ### 選一種執行方式
 
-| | 網頁版 | 終端機版 |
+| | ⭐️網頁版 | 終端機版 |
 |---|---|---|
 | 跑在哪裡 | 你的 Google 帳號，使用 Google Apps Script | 你的電腦，使用 Node.js |
 | 怎麼使用 | 開書籤、按按鈕 | 輸入指令 |
@@ -229,7 +229,7 @@ References: [Apps Script deployment](https://developers.google.com/apps-script/g
 
 完成後，你手上應有兩樣東西：**Notion 密鑰、資料庫連結**。之後換另一種執行方式也能沿用。
 
-### 方法一：網頁版
+### 方法一：網頁版（⭐️推薦）
 
 **這是在你的 Google 帳號裡建立一份私人網頁工具。** 準備瀏覽器、收到申請信的 Google 帳號，以及上面的 Notion 資料即可。
 
