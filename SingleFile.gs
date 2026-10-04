@@ -2,13 +2,13 @@
 function dataSource_() {
   const id = PropertiesService.getScriptProperties().getProperty('NOTION_DATA_SOURCE_ID');
   if (!id || !/^[a-f0-9]{8}-?[a-f0-9]{4}-?[a-f0-9]{4}-?[a-f0-9]{4}-?[a-f0-9]{12}$/i.test(id)) {
-    throw Error('請在指令碼屬性設定有效的 NOTION_DATA_SOURCE_ID');
+    throw Error('Connect Notion in the setup panel to configure a valid data source.');
   }
   return id;
 }
 const MAIL_QUERY = 'from:jobs-noreply@linkedin.com {subject:"您的應徵資料已傳送到" subject:"Your application was sent to" subject:"Your application has been sent to"}';
 function doGet() {
-  return HtmlService.createHtmlOutput("<!DOCTYPE html><html lang=\"zh-Hant\"><head><base target=\"_top\"><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n<style>\n*{box-sizing:border-box}body{margin:0;background:#f4f5f7;color:#182532;font:15px/1.6 system-ui,sans-serif}main{max-width:1120px;margin:64px auto;padding:0 24px}.eyebrow{color:#476b65;letter-spacing:.13em;font-size:12px;font-weight:700}h1{font-size:34px;letter-spacing:-.04em;margin:8px 0}p{color:#617080}.panel{background:white;border:1px solid #dfe5e8;border-radius:18px;padding:24px;margin-top:24px}.toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap}button,select,input{font:inherit;border-radius:9px;padding:10px 16px;border:1px solid #d8dfe3}button{cursor:pointer;background:#215d50;color:white;border-color:#215d50}button.secondary{background:white;color:#215d50}button:disabled{opacity:.45;cursor:default}#message{margin-top:18px;white-space:pre-wrap}.table{overflow:auto}table{border-collapse:collapse;width:100%;font-size:14px}th,td{text-align:left;padding:14px 10px;border-bottom:1px solid #e9edef;vertical-align:top}th{color:#687787;font-size:12px}td:nth-child(2){min-width:230px}a{color:#236d96}.badge{display:inline-block;white-space:nowrap;padding:3px 9px;border-radius:6px;background:#edf3f1}.review,.error{background:#fff1d9}.duplicate{background:#eef0f3}.muted{color:#76828d;font-size:13px}#empty{padding:42px 12px;text-align:center;color:#82908d}@media(max-width:600px){main{margin:24px auto}h1{font-size:27px}.panel{padding:16px}}\n</style></head><body><main><div class=\"eyebrow\">GMAIL → NOTION</div><h1>申請紀錄小幫手</h1><p>把 LinkedIn 申請確認信，整理到你的 Job Tracker。</p>\n<details class=\"panel\" id=\"setup\"><summary>首次設定／更換 Notion 連線</summary><p>先在 Notion 建立連線並授權資料庫，然後貼上以下兩項即可。詳見 README 的首次設定。</p><div class=\"toolbar\"><label for=\"secret\">Notion 連線密鑰</label><input id=\"secret\" type=\"password\" autocomplete=\"off\"><label for=\"databaseLink\">資料庫連結</label><input id=\"databaseLink\" type=\"url\" placeholder=\"貼上原始表格的連結\"><select id=\"source\" aria-label=\"資料來源\" hidden></select><button id=\"save\">連接 Notion</button></div><p id=\"setupStatus\" role=\"status\"></p></details>\n<div class=\"panel\"><div class=\"toolbar\" style=\"margin-bottom:16px\"><label for=\"startDate\">開始日期</label><input type=\"date\" id=\"startDate\" min=\"1970-01-01\" max=\"9998-12-31\"><label for=\"endDate\">結束日期</label><input type=\"date\" id=\"endDate\" min=\"1970-01-01\" max=\"9998-12-31\"></div><p class=\"muted\" id=\"dateHint\"></p><div class=\"toolbar\"><button id=\"preview\">檢查並預覽</button><button class=\"secondary\" id=\"import\" disabled>匯入可新增項目</button></div><div id=\"message\" role=\"status\" aria-live=\"polite\">選擇日期後預覽，確認內容再匯入。</div><p class=\"muted\">只新增缺少的申請。相同職缺會跳過；可能重複的紀錄會列出待確認。既有申請的狀態會保留。</p></div>\n<div class=\"panel table\"><div id=\"empty\">預覽會顯示公司、職位、申請日期，以及重複檢查結果。</div><table id=\"table\" hidden><thead><tr><th>Company</th><th>Position</th><th>Status</th><th>Website</th><th>Apply Date</th><th>檢查結果</th></tr></thead><tbody id=\"rows\"></tbody></table></div>\n<p class=\"muted\">支援中英文 LinkedIn 申請已送出確認信（繁體中文／英文）。搜尋到但無法解析的格式會列為待確認。</p></main>\n<script>\nlet tickets=[], working=false;const $=id=>document.getElementById(id);const labels={new:'可新增',duplicate:'已存在',review:'待確認',created:'已新增',error:'未完成'};\nfunction busy(v){working=v;for(const id of ['preview','startDate','endDate','save','secret','databaseLink','source']) $(id).disabled=v;$('import').disabled=v||!tickets.length;}\nfunction error(e){tickets=[];busy(false);$('message').textContent=e.message||String(e);}\nfunction render(data){$('rows').replaceChildren();$('table').hidden=!data.results.length;$('empty').hidden=!!data.results.length;\nfor(const r of data.results){const tr=document.createElement('tr');for(const key of ['Company','Position','Status','Website','Apply Date']){const td=document.createElement('td');if(key==='Website'&&r[key]){const a=document.createElement('a');a.href=r[key];a.textContent='LinkedIn 職缺';a.target='_blank';a.rel='noopener noreferrer';td.append(a);}else td.textContent=r[key]||'—';tr.append(td);}const td=document.createElement('td'),badge=document.createElement('span');badge.className='badge '+r.state;badge.textContent=labels[r.state]||r.state;td.append(badge);const note=document.createElement('div');note.className='muted';note.textContent=r.reason||'';td.append(note);tr.append(td);$('rows').append(tr);}}\nfunction dateRange(){\n  const start=$('startDate'),end=$('endDate');\n  if(!start.checkValidity()||!end.checkValidity()) throw Error('請輸入有效日期');\n  if(start.value && end.value && start.value>end.value) throw Error('開始日期不能晚於結束日期');\n  const midnight=value=>{const [y,m,d]=value.split('-').map(Number);const date=new Date(0);date.setFullYear(y,m-1,d);date.setHours(0,0,0,0);return date;};\n  const from=start.value?midnight(start.value):null,to=end.value?midnight(end.value):null;\n  if(to) to.setDate(to.getDate()+1);\n  return {startSeconds:from?Math.floor(from.getTime()/1000):null,endSeconds:to?Math.floor(to.getTime()/1000):null};\n}\n$('dateHint').textContent='依收信日期搜尋，包含開始與結束當天；留空代表不限。時區：'+Intl.DateTimeFormat().resolvedOptions().timeZone+'。Apply Date 仍採用信件中的應徵日期。';\nfunction resetPreview(){tickets=[];$('rows').replaceChildren();$('table').hidden=true;$('empty').hidden=false;$('message').textContent='搜尋條件已變更，請重新預覽。';busy(false);}\nfor(const id of ['startDate','endDate']) $(id).onchange=resetPreview;\nconst call=(name,...args)=>new Promise((resolve,reject)=>google.script.run.withSuccessHandler(resolve).withFailureHandler(reject)[name](...args));\n$('preview').onclick=async()=>{\n  if(working)return;\n  let range;try{range=dateRange();}catch(e){error(e);return;}\n  tickets=[];busy(true);const results=[], seen=new Set();let cursor=null;\n  try {\n    do {\n      $('message').textContent='正在搜尋與比對…已檢查 '+results.length+' 筆，請保持此頁開啟。';\n      const data=await call('previewApplications',range,cursor);\n      results.push(...data.results);render({results});\n      if(data.results.some(r=>r.state==='new'))tickets.push(data.ticket);\n      cursor=data.nextCursor;\n      if(cursor && seen.has(cursor))throw Error('分頁回應重複，請重新預覽');\n      if(cursor)seen.add(cursor);\n    }while(cursor);\n    busy(false);$('message').textContent='日期範圍搜尋完成：'+results.length+' 筆，'+results.filter(r=>r.state==='new').length+' 筆候選新增。匯入時會再次去重。請在 30 分鐘內匯入。';\n  }catch(e){error(e);}\n};\n$('import').onclick=async()=>{\n  if(working||!tickets.length)return;\n  const queue=tickets.slice();tickets=[];busy(true);const results=[];\n  try {\n    for(const ticket of queue){\n      $('message').textContent='正在匯入…已處理 '+results.length+' 筆，請保持此頁開啟。';\n      const data=await call('importApplications',ticket);results.push(...data.results);render({results});\n      if(data.results.some(r=>r.state==='error'))throw Error('部分匯入未完成，已停止。請先查看結果，再重新預覽。');\n    }\n    busy(false);$('message').textContent='完成：新增 '+results.filter(r=>r.state==='created').length+' 筆。已存在與待確認的項目已跳過。';\n  }catch(e){error(e);}\n};\nfor(const id of ['secret','databaseLink']) $(id).oninput=()=>{$('source').replaceChildren();$('source').hidden=true;};\n$('save').onclick=async()=>{\n  if(working)return;\n  tickets=[];busy(true);$('setupStatus').textContent='正在檢查 Notion 連線…';\n  try {\n    const data=await call('saveConnection',$('secret').value,$('databaseLink').value,$('source').value||null);\n    if(data.sources){$('source').replaceChildren();for(const item of data.sources){const option=document.createElement('option');option.value=item.id;option.textContent=item.name;$('source').append(option);}$('source').hidden=false;$('setupStatus').textContent='請選擇資料來源，再按連接 Notion。';}\n    else {$('secret').value='';$('databaseLink').value='';$('setupStatus').textContent='已連接，設定會保存在你的私人專案。';$('setup').open=false;resetPreview();}\n  }catch(e){$('setupStatus').textContent=e.message||String(e);}\n  finally{busy(false);}\n};\ncall('connectionStatus').then(data=>{$('setup').open=!data.ready;$('setupStatus').textContent=data.ready?'已設定 Notion 連線。':'尚未設定 Notion，請完成首次設定。';}).catch(error);\n</script></body></html>\n").setTitle('申請紀錄小幫手');
+  return HtmlService.createHtmlOutput("<!DOCTYPE html><html lang=\"en\"><head><base target=\"_top\"><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n<style>\n*{box-sizing:border-box}body{margin:0;background:#f4f5f7;color:#182532;font:15px/1.6 system-ui,sans-serif}main{max-width:1120px;margin:64px auto;padding:0 24px}.eyebrow{color:#476b65;letter-spacing:.13em;font-size:12px;font-weight:700}h1{font-size:34px;letter-spacing:-.04em;margin:8px 0}p{color:#617080}.panel{background:white;border:1px solid #dfe5e8;border-radius:18px;padding:24px;margin-top:24px}.toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap}button,select,input{font:inherit;border-radius:9px;padding:10px 16px;border:1px solid #d8dfe3}button{cursor:pointer;background:#215d50;color:white;border-color:#215d50}button.secondary{background:white;color:#215d50}button:disabled{opacity:.45;cursor:default}#message{margin-top:18px;white-space:pre-wrap}.table{overflow:auto}table{border-collapse:collapse;width:100%;font-size:14px}th,td{text-align:left;padding:14px 10px;border-bottom:1px solid #e9edef;vertical-align:top}th{color:#687787;font-size:12px}td:nth-child(2){min-width:230px}a{color:#236d96}.badge{display:inline-block;white-space:nowrap;padding:3px 9px;border-radius:6px;background:#edf3f1}.review,.error{background:#fff1d9}.duplicate{background:#eef0f3}.muted{color:#76828d;font-size:13px}#empty{padding:42px 12px;text-align:center;color:#82908d}@media(max-width:600px){main{margin:24px auto}h1{font-size:27px}.panel{padding:16px}}\n</style></head><body><main><div class=\"eyebrow\">GMAIL → NOTION</div><h1>LinkedIn Application Tracker</h1><p>Turn LinkedIn application confirmation emails into records in your Notion job tracker.</p>\n<details class=\"panel\" id=\"setup\"><summary>Set up or change Notion connection</summary><p>Create a Notion connection, grant it access to your database, then enter the details below. See the README for setup instructions.</p><div class=\"toolbar\"><label for=\"secret\">Notion connection secret</label><input id=\"secret\" type=\"password\" autocomplete=\"off\"><label for=\"databaseLink\">Database link</label><input id=\"databaseLink\" type=\"url\" placeholder=\"Paste the original database link\"><select id=\"source\" aria-label=\"Data source\" hidden></select><button id=\"save\">Connect Notion</button></div><p id=\"setupStatus\" role=\"status\"></p></details>\n<div class=\"panel\"><div class=\"toolbar\" style=\"margin-bottom:16px\"><label for=\"startDate\">Start date</label><input type=\"date\" id=\"startDate\" min=\"1970-01-01\" max=\"9998-12-31\"><label for=\"endDate\">End date</label><input type=\"date\" id=\"endDate\" min=\"1970-01-01\" max=\"9998-12-31\"></div><p class=\"muted\" id=\"dateHint\"></p><div class=\"toolbar\"><button id=\"preview\">Check and preview</button><button class=\"secondary\" id=\"import\" disabled>Import new applications</button></div><div id=\"message\" role=\"status\" aria-live=\"polite\">Choose dates, preview the results, then import.</div><p class=\"muted\">Only missing applications are added. Matching jobs are skipped; possible duplicates are flagged for review. Existing application statuses are preserved.</p></div>\n<div class=\"panel table\"><div id=\"empty\">Preview companies, positions, application dates, and duplicate checks here.</div><table id=\"table\" hidden><thead><tr><th>Company</th><th>Position</th><th>Status</th><th>Website</th><th>Apply Date</th><th>Check result</th></tr></thead><tbody id=\"rows\"></tbody></table></div>\n<p class=\"muted\">Supports English and Traditional Chinese LinkedIn application confirmations. Matching emails with unsupported layouts are flagged for manual review.</p></main>\n<script>\nlet tickets=[], working=false;const $=id=>document.getElementById(id);const labels={new:'Ready to import',duplicate:'Already exists',review:'Needs review',created:'Created',error:'Incomplete'};\nfunction busy(v){working=v;for(const id of ['preview','startDate','endDate','save','secret','databaseLink','source']) $(id).disabled=v;$('import').disabled=v||!tickets.length;}\nfunction errorMessage(e){\n  const message=String(e && e.message || e || '');\n  return !message || /[^\\x00-\\x7F]/.test(message)\n    ? 'The operation could not be completed. Check your connection and service permissions, then preview again to verify completed records.'\n    : message;\n}\nfunction error(e){tickets=[];busy(false);$('message').textContent=errorMessage(e);}\nfunction render(data){$('rows').replaceChildren();$('table').hidden=!data.results.length;$('empty').hidden=!!data.results.length;\nfor(const r of data.results){const tr=document.createElement('tr');for(const key of ['Company','Position','Status','Website','Apply Date']){const td=document.createElement('td');if(key==='Website'&&r[key]){const a=document.createElement('a');a.href=r[key];a.textContent='LinkedIn job';a.target='_blank';a.rel='noopener noreferrer';td.append(a);}else td.textContent=r[key]||'—';tr.append(td);}const td=document.createElement('td'),badge=document.createElement('span');badge.className='badge '+r.state;badge.textContent=labels[r.state]||r.state;td.append(badge);const note=document.createElement('div');note.className='muted';note.textContent=r.reason?errorMessage(r.reason):'';td.append(note);tr.append(td);$('rows').append(tr);}}\nfunction dateRange(){\n  const start=$('startDate'),end=$('endDate');\n  if(!start.checkValidity()||!end.checkValidity()) throw Error('Enter valid dates.');\n  if(start.value && end.value && start.value>end.value) throw Error('Start date cannot be later than end date.');\n  const midnight=value=>{const [y,m,d]=value.split('-').map(Number);const date=new Date(0);date.setFullYear(y,m-1,d);date.setHours(0,0,0,0);return date;};\n  const from=start.value?midnight(start.value):null,to=end.value?midnight(end.value):null;\n  if(to) to.setDate(to.getDate()+1);\n  return {startSeconds:from?Math.floor(from.getTime()/1000):null,endSeconds:to?Math.floor(to.getTime()/1000):null};\n}\n$('dateHint').textContent='Search by received date, including both selected days. Leave a date blank for no bound. Time zone: '+Intl.DateTimeFormat().resolvedOptions().timeZone+'. Apply Date uses the application date stated in the email.';\nfunction resetPreview(){tickets=[];$('rows').replaceChildren();$('table').hidden=true;$('empty').hidden=false;$('message').textContent='Search dates changed. Preview again.';busy(false);}\nfor(const id of ['startDate','endDate']) $(id).onchange=resetPreview;\nconst call=(name,...args)=>new Promise((resolve,reject)=>google.script.run.withSuccessHandler(resolve).withFailureHandler(reject)[name](...args));\n$('preview').onclick=async()=>{\n  if(working)return;\n  let range;try{range=dateRange();}catch(e){error(e);return;}\n  tickets=[];busy(true);const results=[], seen=new Set();let cursor=null;\n  try {\n    do {\n      $('message').textContent='Searching and checking... '+results.length+' records processed. Keep this page open.';\n      const data=await call('previewApplications',range,cursor);\n      results.push(...data.results);render({results});\n      if(data.results.some(r=>r.state==='new'))tickets.push(data.ticket);\n      cursor=data.nextCursor;\n      if(cursor && seen.has(cursor))throw Error('Repeated pagination response. Preview again.');\n      if(cursor)seen.add(cursor);\n    }while(cursor);\n    busy(false);$('message').textContent='Date-range search complete: '+results.length+' records, '+results.filter(r=>r.state==='new').length+' candidates for import. Duplicates will be checked again during import. Import within 30 minutes.';\n  }catch(e){error(e);}\n};\n$('import').onclick=async()=>{\n  if(working||!tickets.length)return;\n  const queue=tickets.slice();tickets=[];busy(true);const results=[];\n  try {\n    for(const ticket of queue){\n      $('message').textContent='Importing... '+results.length+' records processed. Keep this page open.';\n      const data=await call('importApplications',ticket);results.push(...data.results);render({results});\n      if(data.results.some(r=>r.state==='error'))throw Error('Import stopped before completion. Review the results, then preview again.');\n    }\n    busy(false);$('message').textContent='Done: '+results.filter(r=>r.state==='created').length+' records created. Existing applications and items needing review were skipped.';\n  }catch(e){error(e);}\n};\nfor(const id of ['secret','databaseLink']) $(id).oninput=()=>{$('source').replaceChildren();$('source').hidden=true;};\n$('save').onclick=async()=>{\n  if(working)return;\n  tickets=[];busy(true);$('setupStatus').textContent='Checking the Notion connection...';\n  try {\n    const data=await call('saveConnection',$('secret').value,$('databaseLink').value,$('source').value||null);\n    if(data.sources){$('source').replaceChildren();for(const item of data.sources){const option=document.createElement('option');option.value=item.id;option.textContent=item.name;$('source').append(option);}$('source').hidden=false;$('setupStatus').textContent='Select a data source, then click Connect Notion.';}\n    else {$('secret').value='';$('databaseLink').value='';$('setupStatus').textContent='Connected. Settings are saved in your private project.';$('setup').open=false;resetPreview();}\n  }catch(e){$('setupStatus').textContent=errorMessage(e);}\n  finally{busy(false);}\n};\ncall('connectionStatus').then(data=>{$('setup').open=!data.ready;$('setupStatus').textContent=data.ready?'Notion connection configured.':'Notion is not connected. Complete setup first.';}).catch(error);\n</script></body></html>\n").setTitle('LinkedIn Application Tracker');
 }
 function norm_(s) { return String(s || '').normalize('NFKC').toLowerCase().replace(/\s+/g,' ').trim(); }
 function ids_(s) { return [...String(s || '').matchAll(/https?:\/\/(?:[\w-]+\.)?linkedin\.com\/(?:comm\/)?jobs\/view\/(\d+)/gi)].map(m=>m[1]); }
@@ -22,7 +22,7 @@ function applicationDate_(main) {
   if(m) { [,y,month,day]=m; }
   else {
     const dateLine=main.match(/(?:Date applied|Applied on|Application date)\s*[:：]?\s*([^\r\n]+)/i);
-    if(!dateLine) throw Error('缺少明確申請日期，請手動確認');
+    if(!dateLine) throw Error('Application date is missing. Review this email manually.');
     const value=dateLine[1].replace(/-{3,}.*$/,'').trim();
     const months=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
     if((m=value.match(/^(\d{4})-(\d{2})-(\d{2})$/))) [,y,month,day]=m;
@@ -30,27 +30,27 @@ function applicationDate_(main) {
       month=months.indexOf(m[1].toLowerCase().slice(0,3))+1;day=m[2];y=m[3];
     } else if((m=value.match(/^(\d{1,2})(?:st|nd|rd|th)? ([A-Za-z]+)\.?,? (\d{4})$/))) {
       day=m[1];month=months.indexOf(m[2].toLowerCase().slice(0,3))+1;y=m[3];
-    } else throw Error('申請日期格式不明確，請手動確認');
+    } else throw Error('Application date is ambiguous. Review this email manually.');
   }
   const iso=String(y)+'-'+String(month).padStart(2,'0')+'-'+String(day).padStart(2,'0');
   const parsed=new Date(iso+'T00:00:00Z');
-  if(!Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0,10)!==iso) throw Error('日期格式不正確');
+  if(!Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0,10)!==iso) throw Error('Invalid date format.');
   return iso;
 }
 function parse_(m) {
-  if (!/(?:^|[<\s])jobs-noreply@linkedin\.com(?:>|$)/i.test(m.sender)) throw Error('不是 LinkedIn 確認信寄件者');
-  if (!/(?:您的應徵資料已傳送到|Your application (?:was|has been) sent to)/i.test(m.subject)) throw Error('不是支援的申請確認信');
+  if (!/(?:^|[<\s])jobs-noreply@linkedin\.com(?:>|$)/i.test(m.sender)) throw Error('Sender is not the supported LinkedIn confirmation sender.');
+  if (!/(?:您的應徵資料已傳送到|Your application (?:was|has been) sent to)/i.test(m.subject)) throw Error('Unsupported application confirmation email.');
   const lines=String(m.body||'').split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
   const header=lines.findIndex(line=>confirmationCompany_(line));
-  if(header<0) throw Error('信件格式不同，請手動確認');
+  if(header<0) throw Error('Unsupported email layout. Review this email manually.');
   const company=confirmationCompany_(lines[header]),position=lines[header+1];
-  if(!position || norm_(company)!==norm_(lines[header+2])) throw Error('公司資訊不一致');
+  if(!position || norm_(company)!==norm_(lines[header+2])) throw Error('Company details do not match.');
   // Bound the card at its explicit application-date line, before recommendations.
   const dateIndex=lines.findIndex((line,i)=>i>header+2 && /^(?:應徵日期|Date applied|Applied on|Application date)\s*[:：]?/i.test(line));
-  if(dateIndex<0) throw Error('缺少明確申請日期，請手動確認');
+  if(dateIndex<0) throw Error('Application date is missing. Review this email manually.');
   const main=lines.slice(header,dateIndex+1).join('\n');
   const ids=[...new Set(ids_(main))];
-  if(ids.length!==1) throw Error('缺少或無法確認主職缺連結');
+  if(ids.length!==1) throw Error('The main job link is missing or ambiguous.');
   return {Company:company,Position:position,Status:'Applied',Website:'https://www.linkedin.com/jobs/view/'+ids[0]+'/',
     'Apply Date':applicationDate_(main),messageId:m.id};
 }
@@ -58,7 +58,7 @@ function decision_(a, rows) {
   const ai = ids_(a.Website);
   for (const b of rows) {
     const bi = ids_((b.Website||'')+' '+(b.Position||''));
-    if (ai.some(x=>bi.includes(x))) return {state:'duplicate',reason:'相同 LinkedIn 職缺',url:b.url||''};
+    if (ai.some(x=>bi.includes(x))) return {state:'duplicate',reason:'Same LinkedIn job.',url:b.url||''};
   }
   let uncertain;
   for (const b of rows) {
@@ -66,14 +66,14 @@ function decision_(a, rows) {
     const bi=ids_((b.Website||'')+' '+(b.Position||''));
     if (ai.length && bi.length) continue;
     const pos=norm_(a.Position)===norm_(b.Position), day=a['Apply Date']===b['Apply Date'];
-    if(pos && day) return {state:'duplicate',reason:'公司、職位與日期相同',url:b.url||''};
-    if(pos || (!b.Position && day)) uncertain={state:'review',reason:'可能是已有申請，請確認',url:b.url||''};
+    if(pos && day) return {state:'duplicate',reason:'Same company, position, and application date.',url:b.url||''};
+    if(pos || (!b.Position && day)) uncertain={state:'review',reason:'Possible existing application. Review manually.',url:b.url||''};
   }
-  return uncertain || {state:'new',reason:'可新增',url:''};
+  return uncertain || {state:'new',reason:'Ready to import',url:''};
 }
 function token_() {
   const t=PropertiesService.getScriptProperties().getProperty('NOTION_TOKEN');
-  if(!t) throw Error('請先在專案設定的指令碼屬性新增 NOTION_TOKEN，並將 Job Tracker 連接至該 Notion integration。');
+  if(!t) throw Error('Connect Notion in the setup panel and grant the connection access to your database.');
   return t;
 }
 function notion_(path, method, body, secret) {
@@ -83,14 +83,14 @@ function notion_(path, method, body, secret) {
     method:method||'get',headers:{Authorization:'Bearer '+(secret||token_()),'Notion-Version':'2025-09-03'},
     contentType:'application/json',payload:body===undefined?undefined:JSON.stringify(body),muteHttpExceptions:true
   });
-  if(response.getResponseCode()>=300) throw Error('Notion 連線失敗（'+response.getResponseCode()+'）。請檢查授權；若剛才正在匯入，重新預覽會核對已完成項目。');
+  if(response.getResponseCode()>=300) throw Error('Notion connection failed ('+response.getResponseCode()+'). Check access permissions. If an import was in progress, preview again to check completed records.');
   return JSON.parse(response.getContentText());
 }
 function validateSchema_(p) {
   for(const [name,type] of Object.entries({Company:'title',Position:'rich_text',Status:'select',Website:'rich_text','Apply Date':'date'})) {
-    if(!p[name] || p[name].type!==type) throw Error('Notion 欄位 '+name+' 類型不符，請檢查資料庫。');
+    if(!p[name] || p[name].type!==type) throw Error('Notion property '+name+' has an unexpected type. Check your database schema.');
   }
-  if(!p.Status.select.options.some(o=>o.name==='Applied')) throw Error('Status 缺少 Applied 選項');
+  if(!p.Status.select.options.some(o=>o.name==='Applied')) throw Error('The Status property needs an Applied option.');
 }
 function checkSchema_() { validateSchema_(notion_('data_sources/'+dataSource_()).properties); }
 function connectionStatus() {
@@ -100,24 +100,24 @@ function connectionStatus() {
 function databaseId_(value) {
   const input=String(value||'').trim();
   if (/^[a-f0-9-]{32,36}$/i.test(input)) return input.replace(/-/g,'');
-  if (!/^https:\/\/(?:www\.|app\.)?notion\.(?:so|com)\//i.test(input)) throw Error('請貼上 Notion 原始資料庫的連結');
+  if (!/^https:\/\/(?:www\.|app\.)?notion\.(?:so|com)\//i.test(input)) throw Error('Paste the original Notion database link.');
   const path=input.split('?')[0].split('#')[0];
   const match=path.match(/([a-f0-9]{32}|[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})\/?$/i);
-  if(!match) throw Error('無法從連結辨識資料庫，請先將表格開啟為整頁再複製連結');
+  if(!match) throw Error('Cannot identify the database. Open the original table as a full page, then copy its link.');
   return match[1].replace(/-/g,'');
 }
 function saveConnection(secret, databaseLink, selectedSource) {
   secret=String(secret||'').trim();
-  if(!/^(?:ntn_|secret_)[A-Za-z0-9_-]+$/.test(secret)) throw Error('請貼上有效的 Notion 連線密鑰');
+  if(!/^(?:ntn_|secret_)[A-Za-z0-9_-]+$/.test(secret)) throw Error('Enter a valid Notion connection secret.');
   const lock=LockService.getScriptLock();
-  if(!lock.tryLock(1000)) throw Error('正在處理其他操作，請稍後再試');
+  if(!lock.tryLock(1000)) throw Error('Another operation is running. Try again shortly.');
   try {
     const database=notion_('databases/'+databaseId_(databaseLink),'get',undefined,secret);
     const sources=database.data_sources||[];
-    if(!sources.length) throw Error('此連結沒有資料來源，請使用原始資料庫連結');
+    if(!sources.length) throw Error('No data sources found. Use the original database link.');
     if(sources.length>1 && !selectedSource) return {ready:false,sources:sources.map(x=>({id:x.id,name:x.name}))};
     const source=selectedSource?sources.find(x=>x.id===selectedSource):sources[0];
-    if(!source) throw Error('請選擇這個資料庫中的資料來源');
+    if(!source) throw Error('Select a data source from this database.');
     validateSchema_(notion_('data_sources/'+source.id,'get',undefined,secret).properties);
     // Save only after both access and schema validation pass; never return the secret.
     PropertiesService.getScriptProperties().setProperties({NOTION_TOKEN:secret,NOTION_DATA_SOURCE_ID:source.id});
@@ -139,7 +139,7 @@ function existing_() {
       return {url:r.url,Company:text_(p.Company),Position:text_(p.Position),Website:text_(p.Website,true),
         'Apply Date':p['Apply Date']&&p['Apply Date'].date?p['Apply Date'].date.start.slice(0,10):''};
     }));
-    if(page.has_more && !page.next_cursor) throw Error('Notion 分頁不完整，已停止匯入');
+    if(page.has_more && !page.next_cursor) throw Error('Notion pagination is incomplete. Import stopped.');
     cursor=page.has_more?page.next_cursor:null;
   } while(cursor);
   return rows;
@@ -155,11 +155,11 @@ function message_(id) {
 }
 function searchQuery_(range) {
   if (range === undefined || range === null) return MAIL_QUERY;
-  if (typeof range !== 'object' || Array.isArray(range)) throw Error('日期範圍格式錯誤');
+  if (typeof range !== 'object' || Array.isArray(range)) throw Error('Invalid date range.');
   const start = range.startSeconds, end = range.endSeconds;
   const valid = v => v == null || (Number.isSafeInteger(v) && v >= 0 && v <= 253402214400);
-  if (!valid(start) || !valid(end)) throw Error('日期範圍格式錯誤');
-  if (start != null && end != null && start >= end) throw Error('開始日期不能晚於結束日期');
+  if (!valid(start) || !valid(end)) throw Error('Invalid date range.');
+  if (start != null && end != null && start >= end) throw Error('Start date cannot be later than end date.');
   // Gmail date strings use Pacific time; epoch seconds preserve the browser's local days.
   return MAIL_QUERY + (start != null ? ' after:' + (start - 1) : '') +
     (end != null ? ' before:' + end : '');
@@ -185,13 +185,13 @@ function previewApplications(range, cursor) {
 }
 function importApplications(ticket) {
   const lock=LockService.getScriptLock();
-  if(!lock.tryLock(1000)) throw Error('已有匯入執行中，請稍後重新預覽');
+  if(!lock.tryLock(1000)) throw Error('An import is already running. Preview again shortly.');
   try {
     const cache=CacheService.getUserCache(), key='preview:'+String(ticket), raw=cache.get(key);
-    if(!raw) throw Error('預覽已過期或已使用，請重新預覽');
+    if(!raw) throw Error('This preview has expired or was already used. Preview again.');
     cache.remove(key);
     const preview=JSON.parse(raw);
-    if(preview.source!==dataSource_()) throw Error('Notion 連線已變更，請重新預覽');
+    if(preview.source!==dataSource_()) throw Error('The Notion connection changed. Preview again.');
     checkSchema_();
     const rows=existing_(), results=[];
     for(const id of preview.ids) {
@@ -202,14 +202,14 @@ function importApplications(ticket) {
         // A pending marker survives ambiguous network failures and prevents blind retries.
         const ledger=PropertiesService.getScriptProperties(), lk='job:'+dataSource_()+':'+ids_(a.Website)[0];
         const old=ledger.getProperty(lk);
-        if(old) { results.push(Object.assign({},a,{state:'review',reason:'先前有匯入紀錄或未確認結果，請在 Notion 核對'})); continue; }
+        if(old) { results.push(Object.assign({},a,{state:'review',reason:'A previous import was recorded or has an uncertain outcome. Check Notion manually.'})); continue; }
         const rt=s=>[{type:'text',text:{content:s}}];
         const properties={Company:{title:rt(a.Company)},Position:{rich_text:rt(a.Position)},Status:{select:{name:'Applied'}},
           Website:{rich_text:[{type:'text',text:{content:a.Website,link:{url:a.Website}}}]},'Apply Date':{date:{start:a['Apply Date']}}};
         ledger.setProperty(lk,'pending');
         const created=notion_('pages','post',{parent:{type:'data_source_id',data_source_id:dataSource_()},properties});
         ledger.setProperty(lk,created.id);
-        rows.push(a); results.push(Object.assign({},a,{state:'created',reason:'已新增',url:created.url}));
+        rows.push(a); results.push(Object.assign({},a,{state:'created',reason:'Created',url:created.url}));
       } catch(e) {
         results.push(Object.assign({},a||{messageId:id},{state:'error',reason:e.message}));
         break; // Return partial success; another preview safely resumes the remaining work.

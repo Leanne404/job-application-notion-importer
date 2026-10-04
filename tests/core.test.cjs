@@ -116,3 +116,17 @@ console.log('Setup validation, multi-source selection, 60-message pagination, cr
   rpc.previewApplications=()=>{throw Error('synthetic preview failure');};await get('preview').onclick();assert.equal(get('import').disabled,true);assert.equal(get('preview').disabled,false);
   console.log('Client automatic paging, queued import, changed-filter invalidation and failure recovery passed.');
 })().catch(e=>{console.error(e);process.exitCode=1;});
+
+// Keep app-authored UI and error messages in English while retaining email patterns.
+assert(!/\p{Script=Han}/u.test(html), 'UI text must be English');
+assert(html.includes('lang="en"'));
+const serverSource=fs.readFileSync('Code.gs','utf8');
+for(const match of serverSource.matchAll(/(?:throw Error\(|reason:)\s*'([^']*)'/g)){
+  assert(!/\p{Script=Han}/u.test(match[1]), 'Server messages must be English');
+}
+const errorCode=html.slice(html.indexOf('function errorMessage(e){'),html.indexOf('function error(e){'));
+const errors={};vm.createContext(errors);vm.runInContext(errorCode,errors);
+assert.equal(errors.errorMessage({message:'Preview expired.'}),'Preview expired.');
+assert.match(errors.errorMessage({message:'服務暫時無法使用'}),/^The operation could not be completed/);
+assert.match(errors.errorMessage(null),/^The operation could not be completed/);
+console.log('English UI, server messages and localized service-error fallback passed.');

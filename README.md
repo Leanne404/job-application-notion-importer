@@ -20,7 +20,7 @@ You choose a date range, preview the matching emails, and click Import. The tool
 
 **Where it runs:** in your own Google account using Google Apps Script. You deploy it once and bookmark the resulting web app URL. Whenever you want to import applications, open that URL, choose dates, preview, and import. You do not need to redeploy each time or keep Codex open. Keep the page open until processing finishes; there is no scheduled background sync.
 
-**What you need:** a Google account receiving the emails and a Notion database you can edit. No Python, Node.js, terminal, or OpenAI/ChatGPT/Codex API key is needed for normal use. The app interface currently uses Traditional Chinese; the instructions below include the button labels.
+**What you need:** a Google account receiving the emails and a Notion database you can edit. No Python, Node.js, terminal, or OpenAI/ChatGPT/Codex API key is needed for normal use. The app interface, help text, status messages, and app-generated errors are in English. Email content and database names retain their original language. Google/Notion authorization screens and native browser controls follow their own language settings.
 
 There is no message-count selector or fixed 50-email total limit. The app automatically reads additional pages and imports in batches. Google and Notion quotas and execution limits still apply; errors stop processing, and a fresh preview checks what has already been imported.
 
@@ -74,9 +74,9 @@ For a Job Tracker inside a Job Finder page, use the link to the actual Job Track
 
 #### 4. Connect from the tool's setup screen
 
-1. Open your bookmarked tool URL and expand **首次設定／更換 Notion 連線** (first-time setup / change Notion connection).
-2. Paste the secret into **Notion 連線密鑰** and the database link into **資料庫連結**.
-3. Click **連接 Notion** (connect Notion). The app discovers the data source and validates the properties. If there are multiple sources, choose the correct table and click Connect again.
+1. Open your bookmarked tool URL and expand **Set up or change Notion connection**.
+2. Paste the secret into **Notion connection secret** and the database link into **Database link**.
+3. Click **Connect Notion**. The app discovers the data source and validates the properties. If there are multiple sources, choose the correct table and click Connect again.
 4. Once connected, start using the date search. You do not need to find a data source ID or manually edit Script Properties.
 
 The secret is sent through your own Apps Script project to Notion for validation. After successful validation, it is saved in your private project's settings, not GitHub, and is never returned in preview results. The secret input is cleared. Project editors can access settings, so keep the project private and do not share screenshots containing credentials.
@@ -84,10 +84,10 @@ The secret is sent through your own Apps Script project to Notion for validation
 ### Everyday use
 
 1. Open your bookmarked web app URL.
-2. Choose **開始日期** (start date) and **結束日期** (end date). Both days are included. Leave either end blank for no bound; leave both blank to search all matching historical confirmations.
-3. Click **檢查並預覽** (check and preview). Wait for the date-range search to finish; additional pages are loaded automatically.
-4. Review the results: **可新增** means a candidate for import, **已存在** means already present, and **待確認** requires manual review.
-5. Click **匯入可新增項目** (import new candidates) and keep the page open until completion. Notion is checked again before records are created.
+2. Choose **Start date** and **End date**. Both days are included. Leave either end blank for no bound; leave both blank to search all matching historical confirmations.
+3. Click **Check and preview**. Wait for the date-range search to finish; additional pages are loaded automatically.
+4. Review the results: **Ready to import** means a candidate for import, **Already exists** means already present, and **Needs review** requires manual review.
+5. Click **Import new applications** and keep the page open until completion. Notion is checked again before records are created.
 
 Search uses the **email receipt date** in your browser's timezone. `Apply Date` uses the date stated inside the email. Preview is read-only; Import creates records. Existing application statuses are preserved. Close the page after completion and reopen the same URL next time—no repeated deployment or setup is needed unless authorization is revoked or expires.
 
@@ -163,7 +163,7 @@ Commit/push checks scan tracked content and history, not account folders on your
 
 這是一個**將 Gmail 裡的 LinkedIn 申請確認信，整理成 Notion 求職紀錄的私人網頁工具**。你不必再逐封複製公司名稱、職位、職缺連結與應徵日期。
 
-選擇日期範圍、預覽結果，再按匯入，工具就會把資料寫到 Notion 的 Company、Position、Status、Website、Apply Date 五個欄位。新增前會檢查重複，新增狀態為 `Applied`，既有紀錄的狀態會保留。支援繁體中文與英文確認信；操作介面目前使用繁體中文。
+選擇日期範圍、預覽結果，再按匯入，工具就會把資料寫到 Notion 的 Company、Position、Status、Website、Apply Date 五個欄位。新增前會檢查重複，新增狀態為 `Applied`，既有紀錄的狀態會保留。支援繁體中文與英文確認信；操作介面、說明、進度與工具產生的錯誤訊息皆為英文。信件內容與資料庫名稱保留原文；Google／Notion 授權畫面及瀏覽器內建控制項依各自語言設定顯示。
 
 **工具放在哪裡？** 它執行在你自己的 Google Apps Script 帳號裡。第一次部署後，把產生的工具網址加入書籤；之後需要匯入時打開網址即可，不用每次重新部署，也不用開 Codex。操作時保持頁面開啟，完成後就可以關閉。它是手動工具，沒有背景自動同步。
 
@@ -224,8 +224,8 @@ Google 和 Notion 是兩個不同服務，因此第一次仍需親自授權。Gm
 
 ### 第四步：在工具畫面完成連接
 
-1. 打開第二步保存的工具網址，展開 **首次設定／更換 Notion 連線**。
-2. 貼上 **Notion 連線密鑰**與**資料庫連結**，按 **連接 Notion**。
+1. 打開第二步保存的工具網址，展開 **Set up or change Notion connection**。
+2. 貼上 **Notion connection secret**與**Database link**，按 **Connect Notion**。
 3. 工具會自動找出資料來源並驗證欄位；若資料庫有多個來源，選擇對應表格後再按一次連接。
 4. 看到已連接後即可使用。不必找 data source ID，也不必進入指令碼屬性手動填設定。
 
@@ -235,9 +235,9 @@ Google 和 Notion 是兩個不同服務，因此第一次仍需親自授權。Gm
 
 1. 開啟書籤中的工具網址。
 2. 選擇開始／結束日期。包含兩端整天；留空代表不限該端，兩端留空會查所有符合條件的歷史確認信。
-3. 按 **檢查並預覽**，等待顯示「日期範圍搜尋完成」。工具會自動讀取後續頁，不需要挑筆數。
-4. 檢查結果：可新增會匯入，已存在會跳過，待確認請手動核對。
-5. 按 **匯入可新增項目**，等待完成。請保持頁面開啟；再次執行時仍會重新比對 Notion。
+3. 按 **Check and preview**，等待顯示「Date-range search complete」。工具會自動讀取後續頁，不需要挑筆數。
+4. 檢查結果：Ready to import 會匯入，Already exists 會跳過，Needs review 請手動核對。
+5. 按 **Import new applications**，等待完成。請保持頁面開啟；再次執行時仍會重新比對 Notion。
 
 搜尋依**收信日期**與瀏覽器時區；Notion 的 Apply Date 仍採用信件內的應徵日期。預覽只讀資料，匯入才新增。既有申請的狀態不會被覆蓋。這是手動工具，沒有背景排程。
 

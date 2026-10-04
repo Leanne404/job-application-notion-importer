@@ -1,28 +1,34 @@
-<!DOCTYPE html><html lang="zh-Hant"><head><base target="_top"><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<!DOCTYPE html><html lang="en"><head><base target="_top"><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
 *{box-sizing:border-box}body{margin:0;background:#f4f5f7;color:#182532;font:15px/1.6 system-ui,sans-serif}main{max-width:1120px;margin:64px auto;padding:0 24px}.eyebrow{color:#476b65;letter-spacing:.13em;font-size:12px;font-weight:700}h1{font-size:34px;letter-spacing:-.04em;margin:8px 0}p{color:#617080}.panel{background:white;border:1px solid #dfe5e8;border-radius:18px;padding:24px;margin-top:24px}.toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap}button,select,input{font:inherit;border-radius:9px;padding:10px 16px;border:1px solid #d8dfe3}button{cursor:pointer;background:#215d50;color:white;border-color:#215d50}button.secondary{background:white;color:#215d50}button:disabled{opacity:.45;cursor:default}#message{margin-top:18px;white-space:pre-wrap}.table{overflow:auto}table{border-collapse:collapse;width:100%;font-size:14px}th,td{text-align:left;padding:14px 10px;border-bottom:1px solid #e9edef;vertical-align:top}th{color:#687787;font-size:12px}td:nth-child(2){min-width:230px}a{color:#236d96}.badge{display:inline-block;white-space:nowrap;padding:3px 9px;border-radius:6px;background:#edf3f1}.review,.error{background:#fff1d9}.duplicate{background:#eef0f3}.muted{color:#76828d;font-size:13px}#empty{padding:42px 12px;text-align:center;color:#82908d}@media(max-width:600px){main{margin:24px auto}h1{font-size:27px}.panel{padding:16px}}
-</style></head><body><main><div class="eyebrow">GMAIL → NOTION</div><h1>申請紀錄小幫手</h1><p>把 LinkedIn 申請確認信，整理到你的 Job Tracker。</p>
-<details class="panel" id="setup"><summary>首次設定／更換 Notion 連線</summary><p>先在 Notion 建立連線並授權資料庫，然後貼上以下兩項即可。詳見 README 的首次設定。</p><div class="toolbar"><label for="secret">Notion 連線密鑰</label><input id="secret" type="password" autocomplete="off"><label for="databaseLink">資料庫連結</label><input id="databaseLink" type="url" placeholder="貼上原始表格的連結"><select id="source" aria-label="資料來源" hidden></select><button id="save">連接 Notion</button></div><p id="setupStatus" role="status"></p></details>
-<div class="panel"><div class="toolbar" style="margin-bottom:16px"><label for="startDate">開始日期</label><input type="date" id="startDate" min="1970-01-01" max="9998-12-31"><label for="endDate">結束日期</label><input type="date" id="endDate" min="1970-01-01" max="9998-12-31"></div><p class="muted" id="dateHint"></p><div class="toolbar"><button id="preview">檢查並預覽</button><button class="secondary" id="import" disabled>匯入可新增項目</button></div><div id="message" role="status" aria-live="polite">選擇日期後預覽，確認內容再匯入。</div><p class="muted">只新增缺少的申請。相同職缺會跳過；可能重複的紀錄會列出待確認。既有申請的狀態會保留。</p></div>
-<div class="panel table"><div id="empty">預覽會顯示公司、職位、申請日期，以及重複檢查結果。</div><table id="table" hidden><thead><tr><th>Company</th><th>Position</th><th>Status</th><th>Website</th><th>Apply Date</th><th>檢查結果</th></tr></thead><tbody id="rows"></tbody></table></div>
-<p class="muted">支援中英文 LinkedIn 申請已送出確認信（繁體中文／英文）。搜尋到但無法解析的格式會列為待確認。</p></main>
+</style></head><body><main><div class="eyebrow">GMAIL → NOTION</div><h1>LinkedIn Application Tracker</h1><p>Turn LinkedIn application confirmation emails into records in your Notion job tracker.</p>
+<details class="panel" id="setup"><summary>Set up or change Notion connection</summary><p>Create a Notion connection, grant it access to your database, then enter the details below. See the README for setup instructions.</p><div class="toolbar"><label for="secret">Notion connection secret</label><input id="secret" type="password" autocomplete="off"><label for="databaseLink">Database link</label><input id="databaseLink" type="url" placeholder="Paste the original database link"><select id="source" aria-label="Data source" hidden></select><button id="save">Connect Notion</button></div><p id="setupStatus" role="status"></p></details>
+<div class="panel"><div class="toolbar" style="margin-bottom:16px"><label for="startDate">Start date</label><input type="date" id="startDate" min="1970-01-01" max="9998-12-31"><label for="endDate">End date</label><input type="date" id="endDate" min="1970-01-01" max="9998-12-31"></div><p class="muted" id="dateHint"></p><div class="toolbar"><button id="preview">Check and preview</button><button class="secondary" id="import" disabled>Import new applications</button></div><div id="message" role="status" aria-live="polite">Choose dates, preview the results, then import.</div><p class="muted">Only missing applications are added. Matching jobs are skipped; possible duplicates are flagged for review. Existing application statuses are preserved.</p></div>
+<div class="panel table"><div id="empty">Preview companies, positions, application dates, and duplicate checks here.</div><table id="table" hidden><thead><tr><th>Company</th><th>Position</th><th>Status</th><th>Website</th><th>Apply Date</th><th>Check result</th></tr></thead><tbody id="rows"></tbody></table></div>
+<p class="muted">Supports English and Traditional Chinese LinkedIn application confirmations. Matching emails with unsupported layouts are flagged for manual review.</p></main>
 <script>
-let tickets=[], working=false;const $=id=>document.getElementById(id);const labels={new:'可新增',duplicate:'已存在',review:'待確認',created:'已新增',error:'未完成'};
+let tickets=[], working=false;const $=id=>document.getElementById(id);const labels={new:'Ready to import',duplicate:'Already exists',review:'Needs review',created:'Created',error:'Incomplete'};
 function busy(v){working=v;for(const id of ['preview','startDate','endDate','save','secret','databaseLink','source']) $(id).disabled=v;$('import').disabled=v||!tickets.length;}
-function error(e){tickets=[];busy(false);$('message').textContent=e.message||String(e);}
+function errorMessage(e){
+  const message=String(e && e.message || e || '');
+  return !message || /[^\x00-\x7F]/.test(message)
+    ? 'The operation could not be completed. Check your connection and service permissions, then preview again to verify completed records.'
+    : message;
+}
+function error(e){tickets=[];busy(false);$('message').textContent=errorMessage(e);}
 function render(data){$('rows').replaceChildren();$('table').hidden=!data.results.length;$('empty').hidden=!!data.results.length;
-for(const r of data.results){const tr=document.createElement('tr');for(const key of ['Company','Position','Status','Website','Apply Date']){const td=document.createElement('td');if(key==='Website'&&r[key]){const a=document.createElement('a');a.href=r[key];a.textContent='LinkedIn 職缺';a.target='_blank';a.rel='noopener noreferrer';td.append(a);}else td.textContent=r[key]||'—';tr.append(td);}const td=document.createElement('td'),badge=document.createElement('span');badge.className='badge '+r.state;badge.textContent=labels[r.state]||r.state;td.append(badge);const note=document.createElement('div');note.className='muted';note.textContent=r.reason||'';td.append(note);tr.append(td);$('rows').append(tr);}}
+for(const r of data.results){const tr=document.createElement('tr');for(const key of ['Company','Position','Status','Website','Apply Date']){const td=document.createElement('td');if(key==='Website'&&r[key]){const a=document.createElement('a');a.href=r[key];a.textContent='LinkedIn job';a.target='_blank';a.rel='noopener noreferrer';td.append(a);}else td.textContent=r[key]||'—';tr.append(td);}const td=document.createElement('td'),badge=document.createElement('span');badge.className='badge '+r.state;badge.textContent=labels[r.state]||r.state;td.append(badge);const note=document.createElement('div');note.className='muted';note.textContent=r.reason?errorMessage(r.reason):'';td.append(note);tr.append(td);$('rows').append(tr);}}
 function dateRange(){
   const start=$('startDate'),end=$('endDate');
-  if(!start.checkValidity()||!end.checkValidity()) throw Error('請輸入有效日期');
-  if(start.value && end.value && start.value>end.value) throw Error('開始日期不能晚於結束日期');
+  if(!start.checkValidity()||!end.checkValidity()) throw Error('Enter valid dates.');
+  if(start.value && end.value && start.value>end.value) throw Error('Start date cannot be later than end date.');
   const midnight=value=>{const [y,m,d]=value.split('-').map(Number);const date=new Date(0);date.setFullYear(y,m-1,d);date.setHours(0,0,0,0);return date;};
   const from=start.value?midnight(start.value):null,to=end.value?midnight(end.value):null;
   if(to) to.setDate(to.getDate()+1);
   return {startSeconds:from?Math.floor(from.getTime()/1000):null,endSeconds:to?Math.floor(to.getTime()/1000):null};
 }
-$('dateHint').textContent='依收信日期搜尋，包含開始與結束當天；留空代表不限。時區：'+Intl.DateTimeFormat().resolvedOptions().timeZone+'。Apply Date 仍採用信件中的應徵日期。';
-function resetPreview(){tickets=[];$('rows').replaceChildren();$('table').hidden=true;$('empty').hidden=false;$('message').textContent='搜尋條件已變更，請重新預覽。';busy(false);}
+$('dateHint').textContent='Search by received date, including both selected days. Leave a date blank for no bound. Time zone: '+Intl.DateTimeFormat().resolvedOptions().timeZone+'. Apply Date uses the application date stated in the email.';
+function resetPreview(){tickets=[];$('rows').replaceChildren();$('table').hidden=true;$('empty').hidden=false;$('message').textContent='Search dates changed. Preview again.';busy(false);}
 for(const id of ['startDate','endDate']) $(id).onchange=resetPreview;
 const call=(name,...args)=>new Promise((resolve,reject)=>google.script.run.withSuccessHandler(resolve).withFailureHandler(reject)[name](...args));
 $('preview').onclick=async()=>{
@@ -31,15 +37,15 @@ $('preview').onclick=async()=>{
   tickets=[];busy(true);const results=[], seen=new Set();let cursor=null;
   try {
     do {
-      $('message').textContent='正在搜尋與比對…已檢查 '+results.length+' 筆，請保持此頁開啟。';
+      $('message').textContent='Searching and checking... '+results.length+' records processed. Keep this page open.';
       const data=await call('previewApplications',range,cursor);
       results.push(...data.results);render({results});
       if(data.results.some(r=>r.state==='new'))tickets.push(data.ticket);
       cursor=data.nextCursor;
-      if(cursor && seen.has(cursor))throw Error('分頁回應重複，請重新預覽');
+      if(cursor && seen.has(cursor))throw Error('Repeated pagination response. Preview again.');
       if(cursor)seen.add(cursor);
     }while(cursor);
-    busy(false);$('message').textContent='日期範圍搜尋完成：'+results.length+' 筆，'+results.filter(r=>r.state==='new').length+' 筆候選新增。匯入時會再次去重。請在 30 分鐘內匯入。';
+    busy(false);$('message').textContent='Date-range search complete: '+results.length+' records, '+results.filter(r=>r.state==='new').length+' candidates for import. Duplicates will be checked again during import. Import within 30 minutes.';
   }catch(e){error(e);}
 };
 $('import').onclick=async()=>{
@@ -47,23 +53,23 @@ $('import').onclick=async()=>{
   const queue=tickets.slice();tickets=[];busy(true);const results=[];
   try {
     for(const ticket of queue){
-      $('message').textContent='正在匯入…已處理 '+results.length+' 筆，請保持此頁開啟。';
+      $('message').textContent='Importing... '+results.length+' records processed. Keep this page open.';
       const data=await call('importApplications',ticket);results.push(...data.results);render({results});
-      if(data.results.some(r=>r.state==='error'))throw Error('部分匯入未完成，已停止。請先查看結果，再重新預覽。');
+      if(data.results.some(r=>r.state==='error'))throw Error('Import stopped before completion. Review the results, then preview again.');
     }
-    busy(false);$('message').textContent='完成：新增 '+results.filter(r=>r.state==='created').length+' 筆。已存在與待確認的項目已跳過。';
+    busy(false);$('message').textContent='Done: '+results.filter(r=>r.state==='created').length+' records created. Existing applications and items needing review were skipped.';
   }catch(e){error(e);}
 };
 for(const id of ['secret','databaseLink']) $(id).oninput=()=>{$('source').replaceChildren();$('source').hidden=true;};
 $('save').onclick=async()=>{
   if(working)return;
-  tickets=[];busy(true);$('setupStatus').textContent='正在檢查 Notion 連線…';
+  tickets=[];busy(true);$('setupStatus').textContent='Checking the Notion connection...';
   try {
     const data=await call('saveConnection',$('secret').value,$('databaseLink').value,$('source').value||null);
-    if(data.sources){$('source').replaceChildren();for(const item of data.sources){const option=document.createElement('option');option.value=item.id;option.textContent=item.name;$('source').append(option);}$('source').hidden=false;$('setupStatus').textContent='請選擇資料來源，再按連接 Notion。';}
-    else {$('secret').value='';$('databaseLink').value='';$('setupStatus').textContent='已連接，設定會保存在你的私人專案。';$('setup').open=false;resetPreview();}
-  }catch(e){$('setupStatus').textContent=e.message||String(e);}
+    if(data.sources){$('source').replaceChildren();for(const item of data.sources){const option=document.createElement('option');option.value=item.id;option.textContent=item.name;$('source').append(option);}$('source').hidden=false;$('setupStatus').textContent='Select a data source, then click Connect Notion.';}
+    else {$('secret').value='';$('databaseLink').value='';$('setupStatus').textContent='Connected. Settings are saved in your private project.';$('setup').open=false;resetPreview();}
+  }catch(e){$('setupStatus').textContent=errorMessage(e);}
   finally{busy(false);}
 };
-call('connectionStatus').then(data=>{$('setup').open=!data.ready;$('setupStatus').textContent=data.ready?'已設定 Notion 連線。':'尚未設定 Notion，請完成首次設定。';}).catch(error);
+call('connectionStatus').then(data=>{$('setup').open=!data.ready;$('setupStatus').textContent=data.ready?'Notion connection configured.':'Notion is not connected. Complete setup first.';}).catch(error);
 </script></body></html>
