@@ -38,7 +38,7 @@ function applicationDate_(main) {
   return iso;
 }
 function parse_(m) {
-  if (!/(?:^|[<\s])jobs-noreply@linkedin\.com(?:>|$)/i.test(m.sender)) throw Error('Sender is not the supported LinkedIn confirmation sender.');
+  if (!/^(?:jobs-noreply@linkedin\.com|[^<>\r\n]*<jobs-noreply@linkedin\.com>)$/i.test(String(m.sender||'').trim())) throw Error('Sender is not the supported LinkedIn confirmation sender.');
   if (!/(?:您的應徵資料已傳送到|Your application (?:was|has been) sent to)/i.test(m.subject)) throw Error('Unsupported application confirmation email.');
   const lines=String(m.body||'').split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
   const header=lines.findIndex(line=>confirmationCompany_(line));
@@ -81,7 +81,7 @@ function notion_(path, method, body, secret) {
   Utilities.sleep(350);
   const response=UrlFetchApp.fetch('https://api.notion.com/v1/'+path,{
     method:method||'get',headers:{Authorization:'Bearer '+(secret||token_()),'Notion-Version':'2025-09-03'},
-    contentType:'application/json',payload:body===undefined?undefined:JSON.stringify(body),muteHttpExceptions:true
+    contentType:'application/json',payload:body===undefined?undefined:JSON.stringify(body),muteHttpExceptions:true,followRedirects:false
   });
   if(response.getResponseCode()>=300) throw Error('Notion connection failed ('+response.getResponseCode()+'). Check access permissions. If an import was in progress, preview again to check completed records.');
   return JSON.parse(response.getContentText());

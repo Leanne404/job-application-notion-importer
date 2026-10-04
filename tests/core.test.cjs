@@ -130,3 +130,26 @@ assert.equal(errors.errorMessage({message:'Preview expired.'}),'Preview expired.
 assert.match(errors.errorMessage({message:'服務暫時無法使用'}),/^The operation could not be completed/);
 assert.match(errors.errorMessage(null),/^The operation could not be completed/);
 console.log('English UI, server messages and localized service-error fallback passed.');
+
+// Security regressions: display names cannot masquerade as the sender mailbox.
+assert.throws(()=>ctx.parse_({...sample,sender:'jobs-noreply@linkedin.com <attacker@example.com>'}));
+assert.throws(()=>ctx.parse_({...sample,sender:'LinkedIn <jobs-noreply@linkedin.com>, attacker@example.com'}));
+assert.throws(()=>ctx.parse_({...sample,sender:'LinkedIn <jobs-noreply@linkedin.com>\r\nInjected: header'}));
+assert.equal(ctx.parse_({...sample,sender:'jobs-noreply@linkedin.com'}).Company,'Example Company');
+const securityContext={
+  Utilities:{sleep:()=>{}},
+  UrlFetchApp:{fetch:(url,options)=>{
+    assert.equal(url,'https://api.notion.com/v1/pages');
+    assert.equal(options.followRedirects,false);
+    return {getResponseCode:()=>302,getContentText:()=>{throw Error('Redirect response must not be parsed');}};
+  }}
+};
+vm.createContext(securityContext);vm.runInContext(serverSource,securityContext);
+assert.throws(()=>securityContext.notion_('pages','post',{},'synthetic'),/302/);
+const manifest=JSON.parse(fs.readFileSync('appsscript.json','utf8'));
+assert.equal(manifest.webapp.access,'MYSELF');
+assert.deepEqual(manifest.oauthScopes.slice().sort(),[
+  'https://www.googleapis.com/auth/gmail.readonly','https://www.googleapis.com/auth/script.external_request'
+].sort());
+assert(!/innerHTML\s*=|insertAdjacentHTML\s*\(/.test(html));
+console.log('Sender mailbox, redirect refusal, read-only scopes and private deployment defaults passed.');

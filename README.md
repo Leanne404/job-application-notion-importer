@@ -136,6 +136,9 @@ node cli.mjs import --start 2026-10-01 --end 2026-10-03
 
 ### Privacy and template
 
+
+**Security checks (2026-10-04):** Gmail access is read-only; the deployment manifest defaults to Only myself. The web app sends API requests to Notion and rejects redirects. Email text is displayed as text, not executable HTML. Local Google login uses PKCE and a state check; local API requests restrict destinations and reject redirects. These are code-level protections, not verification of your deployed copy. Project editors can access Apps Script secrets; local credential files are not encrypted. Sender filtering is not a cryptographic proof that an email is authentic. Keep your project private and grant the Notion connection access only to the intended database.
+
 The web version saves credentials in your private Apps Script project. The terminal version saves them as plaintext files under `.local/`, protected by local file permissions where supported. Keep that folder, downloaded OAuth JSON, backups, and application output private. `.gitignore` excludes private files; never force-add them.
 
 You may create your own database or obtain [Niko's Job Tracker template](https://www.notion.com/templates/job-tracker-the-ultimate-job-search-companion) from its original page. **This repository distributes the importer, not the template.** The earlier review (2026-10-03) found no explicit redistribution license; free access does not establish permission to republish it. Obtain the creator's permission before distributing a template copy. [Notion Marketplace terms](https://www.notion.com/help/template-gallery-guidelines-and-terms).
@@ -322,6 +325,9 @@ node cli.mjs import --start 2026-10-01 --end 2026-10-03
 - 這是手動匯入工具，沒有背景同步。不要同時用網頁與終端機對同一資料庫匯入。
 
 ### 隱私與模板
+
+
+**資安檢查（2026-10-04）：** Gmail 只申請唯讀權限，部署設定預設僅限自己；網頁 API 請求送往 Notion 並拒絕轉址，信件文字不當成 HTML 執行。本機 Google 登入使用 PKCE 與 state 驗證，API 請求限制目的地並拒絕轉址。這是程式層的保護，未驗證你實際部署的副本；專案編輯者可取得 Apps Script 密鑰，本機憑證也未加密。寄件者篩選不等於驗證信件真偽。請保持專案私人，Notion 連線只授權需要的資料庫。
 
 網頁版的密鑰存於私人 Apps Script 專案；終端機版存於 `.local/` 明文檔案，使用系統支援的本機權限保護。請保護該資料夾、下載的 OAuth JSON、備份與求職輸出。`.gitignore` 會排除私人檔案，不要強制加入 Git。
 
