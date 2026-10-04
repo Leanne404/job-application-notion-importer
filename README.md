@@ -4,188 +4,174 @@
 
 ## English
 
-**Turn LinkedIn application emails in Gmail into your Notion job tracker.**
+Import LinkedIn application confirmation emails from **Gmail into your Notion job tracker**. Choose receipt dates, preview the results, and confirm the import.
 
-Choose dates → preview → import. Saves **Company, Position, Status, Website, and Apply Date**, checks for duplicates, and preserves existing application statuses.
+The tool fills **Company, Position, Status, Website, and Apply Date**. It checks for duplicates, sets new records to `Applied`, and preserves existing records. It supports **English and Traditional Chinese emails**; the interface and prompts are English.
 
-Supports **English and Traditional Chinese emails**. The interface is English. No OpenAI API key needed.
+### Choose how to run it
 
-### Pick one way to use it
-
-| | Best for | First-time setup |
+| | Web app | Terminal |
 |---|---|---|
-| **Web app — recommended** | Open a bookmark and click buttons | Copy two files into Google Apps Script and connect Notion |
-| **Terminal** | Run longer imports on your computer | Install Node.js 22+, authorize Gmail, and connect Notion |
+| Where it runs | Your Google account, using Google Apps Script | Your own computer, using Node.js |
+| How you use it | Open a bookmarked URL and click buttons | Run a command |
+| What you install | Copy two files into an Apps Script project | Node.js 22+ and this repository |
+| Best for | Everyday imports; no local installation | Longer imports; more initial Gmail setup |
 
-**Limits:** Apps Script has a [6-minute limit per server execution and daily quotas](https://developers.google.com/apps-script/guides/services/quotas). The terminal version avoids those Apps Script limits; **both still have Gmail/Notion API limits**.
+**Choose one method.** Neither needs an OpenAI, ChatGPT, or Codex API key. Google Apps Script is Google's service for running small programs in your Google account. GitHub stores the source code; it does not run the importer or automatically update your deployed copy.
 
-### Start here
+**Limits first:** Apps Script allows [6 minutes per server execution, plus daily quotas](https://developers.google.com/apps-script/guides/services/quotas). This web app processes emails in batches of 20, so a complete session can last longer. The terminal version avoids Apps Script limits, but **both still have [Gmail](https://developers.google.com/workspace/gmail/api/reference/quota) and [Notion](https://developers.notion.com/reference/request-limits) API quotas**. There is no fixed total email cap or guaranteed number of runs per day.
 
-Set up Notion once, then expand **only the method you want**.
+### Prepare Notion once — either method
 
-<details>
-<summary>1. Connect Notion (both methods)</summary>
+Use your existing tracker or create a Notion database with these **exact names and types**:
 
-Create an empty database, or obtain the optional template from its creator's original link below. Configure these exact property names and types:
-
-| Property | Notion type | Requirement |
+| Property | Type | What goes in it |
 |---|---|---|
-| Company | Title | Rename the default Name property if needed |
+| Company | Title | Company name |
 | Position | Text | Job title |
-| Status | Select | Include an option named `Applied` |
-| Website | Text | Clickable job link |
-| Apply Date | Date | Application date |
+| Status | Select, with an `Applied` option | Initial application status |
+| Website | Text | Clickable LinkedIn job link |
+| Apply Date | Date | Application date in the email |
 
-Use **Select**, not Notion's Status type, for `Status`. Both `Position` and `Website` must be Text. Check existing data before changing a template's property types; the app does not change them for you.
+`Status` must be **Select**, not Notion's Status type. Both Position and Website use **Text**. The tool does not change your database structure.
 
-1. Open [Notion integrations](https://www.notion.so/profile/integrations) and create an **Internal integration / Internal connection** in the workspace containing your database.
-2. Enable **Read content** and **Insert content**, then copy the **Internal Integration Secret**.
-3. Open the **original database** in Notion, use its `…` menu → **Connections**, and add that connection. Creating a secret alone does not grant access to the database.
-4. Open the table using **Open as full page**, then choose `…` → **Copy link**.
+1. Open [Notion integrations](https://www.notion.so/profile/integrations), create an **Internal integration / Internal connection**, and select your database's workspace.
+2. Enable **Read content** and **Insert content**. Copy the **Internal Integration Secret**; this is the Notion secret the tool will ask for.
+3. In Notion, open the original database → `…` → **Connections**, and add that connection.
+4. Open the database as a full page and copy its link. For **Job Finder → Job Tracker**, use the **Job Tracker database** link.
 
-For a Job Tracker inside a Job Finder page, use the link to the actual Job Tracker database, not the outer page or an individual application row. For a linked view, open the original database.
+You now have the two things either installation needs: **a Notion secret and a database link**. You can reuse them if you later switch methods.
 
-</details>
+### Method 1: web app
 
-<details>
-<summary>2A. Set up the web app — recommended</summary>
+**You are putting a private copy of this tool in your Google account.** You need a browser, the Google account receiving the emails, and the Notion details above.
 
-#### Copy the app
+#### 1. Copy the two files
 
-1. Sign in to the Google account that **receives the LinkedIn emails**, open [Google Apps Script](https://script.google.com/home/start), and click **New project**.
-2. Name the project, for example, “Application Tracker”.
-3. Open [SingleFile.gs](SingleFile.gs) on GitHub, click **Raw**, and copy the entire file.
-4. In Apps Script, replace all default content in `Code.gs` with that text and save. **Do not also paste the other `.gs` files or create an HTML file.** The single-file version includes the interface.
-5. Open **Project Settings** using the gear icon and enable **Show “appsscript.json” manifest file in editor**.
-6. Return to the editor and replace `appsscript.json` with the contents of this repository's [appsscript.json](appsscript.json). Save. This manifest keeps Gmail access read-only.
-7. Check that **Services** lists **Gmail API**. If missing, click `+`, select Gmail API **v1**, and add it with the identifier `Gmail`.
+1. Open [Google Apps Script](https://script.google.com/home/start) with the receiving Google account and click **New project**. Name it “Application Tracker”.
+2. Open this repository's [SingleFile.gs](SingleFile.gs) → **Raw**, and copy everything. In Apps Script, replace all contents of `Code.gs` with it and save.
+3. In Apps Script **Project Settings** (gear), enable **Show “appsscript.json” manifest file in editor**.
+4. Return to the editor. Replace `appsscript.json` with this repository's [appsscript.json](appsscript.json) and save.
+5. Check **Services** for **Gmail API**. If missing, click `+` → **Gmail API → v1 → Add**, keeping the identifier `Gmail`.
 
-Only two files need to be copied: the packaged script and its permission settings. The other source files are for development.
+`SingleFile.gs` contains the program and interface; `appsscript.json` declares its permissions. **Do not add the other source files or a separate HTML file.**
 
-#### Get your tool URL
+#### 2. Get your private tool URL
 
-1. Click **Deploy → New deployment** at the top right.
-2. Click the gear beside **Select type**, then choose **Web app**.
-3. Set **Execute as** to **Me**.
-4. Set **Who has access** to **Only myself**.
-5. Click **Deploy**. If prompted, choose **Authorize access**, select the receiving Google account, review the read-only Gmail and external connection permissions, and complete authorization.
-6. Open the resulting **Web app URL** and bookmark it. This is the URL you will use every time.
+1. Click **Deploy → New deployment** → select **Web app** as the type.
+2. Set **Execute as: Me** and **Who has access: Only myself**.
+3. Click **Deploy → Authorize access**, choose the receiving Google account, and approve read-only Gmail access and external connections.
+4. Open the resulting **Web app URL** and bookmark it.
 
-If Google shows an unverified-app notice, first verify that it is your own project with the expected code. Do not authorize an unfamiliar app. Organization policies may require administrator assistance. If using a custom Google Cloud project, enable the Gmail API in that project too.
+If Google shows an unverified-app notice, confirm it is your own project and the expected code before proceeding. Organization restrictions may need an administrator. A custom Cloud project also needs Gmail API enabled.
 
-#### Connect Notion
+#### 3. Connect and use it
 
-1. Open your bookmarked tool URL and expand **Set up or change Notion connection**.
-2. Paste the secret into **Notion connection secret** and the database link into **Database link**.
-3. Click **Connect Notion**. The app discovers the data source and validates the properties. If there are multiple sources, choose the correct table and click Connect again.
-4. Once connected, start using the date search. You do not need to find a data source ID or manually edit Script Properties.
+1. On the tool page, expand **Set up or change Notion connection**.
+2. Paste your **Notion connection secret** and **Database link**, then click **Connect Notion**. If asked, select your table and click Connect again.
+3. Select **Start date / End date** → **Check and preview**.
+4. Review the results → **Import new applications**. Keep the page open until it finishes.
 
-The secret is sent through your own Apps Script project to Notion for validation. After successful validation, it is saved in your private project's settings, not GitHub, and is never returned in preview results. The secret input is cleared. Project editors can access settings, so keep the project private and do not share screenshots containing credentials.
+**Next time:** open the same bookmark. You do not need to redeploy or open Codex. Import soon after previewing; web previews expire after about 30 minutes and may be cleared earlier.
 
-</details>
+### Method 2: terminal
 
-<details>
-<summary>2B. Set up the terminal version</summary>
+**You are running the tool on your computer.** This requires a separate one-time Google login setup; it does not use your Apps Script deployment.
 
-1. Install [Node.js](https://nodejs.org/en/download) **22 or newer**. Download this repository using **Code → Download ZIP** and unzip it, or clone it. Open a terminal in the extracted repository folder. Keep the full repository together; the CLI reuses `Code.gs`. No `npm install` is needed.
-2. In [Google Cloud Console](https://console.cloud.google.com/), create/select your own project and enable **Gmail API**. Configure the Google Auth Platform consent screen with your app name and contact details. For a personal account, choose an External audience and add your receiving Gmail account as a test user while in Testing.
-3. Under **Clients**, create an OAuth client with type **Desktop app** and download its JSON file. Keep that download private; do not commit it. A web-app credential or API key will not work. The CLI requests only `gmail.readonly`. See [Google desktop authorization](https://developers.google.com/identity/protocols/oauth2/native-app).
-4. Prepare the same five Notion properties shown in **1. Connect Notion** above. Create an internal Notion connection with Read content and Insert content permissions, connect it to the original database, and have its secret and database link ready. You can reuse your existing Notion connection; the CLI does not read settings from Apps Script.
-5. Run:
+#### 1. Install and open the project
 
-   ```sh
-   node cli.mjs setup
-   ```
+1. Install [Node.js 22 or newer](https://nodejs.org/en/download).
+2. On this GitHub repository, choose **Code → Download ZIP**, then unzip it.
+3. Open Terminal (macOS/Linux) or PowerShell (Windows). Type `cd `, followed by the extracted folder's path in quotes, and press Enter. You should be in the folder containing `cli.mjs`.
+4. Run `node --version` to confirm Node.js is installed.
 
-6. At the prompt, paste the full path to the downloaded Google JSON file **without surrounding quotes**. Open the printed Google sign-in link in a browser **on this same computer** and approve read-only Gmail access. The tool listens only on the computer's loopback address for the callback. Return to the terminal, paste the Notion secret into the hidden prompt, and enter the original database link. If several data sources exist, select the correct table.
+Keep the whole project folder. **No `npm install` is needed.**
 
-Settings are saved privately under `.local/` in the repository folder. Secrets are not command-line arguments, so they are not added to shell command history. The original downloaded OAuth JSON is still private: keep it secure or remove that extra copy after successful setup.
+#### 2. Allow this local tool to read Gmail
 
-**Google Testing-mode reminder:** External OAuth projects in Testing issue refresh tokens that expire after seven days for this Gmail scope. Run `node cli.mjs setup` and choose to reconnect Gmail when needed. Revocation and account policies can also require reauthorization. Changing publishing status involves Google's requirements; the tool does not bypass verification. [Google token expiration](https://developers.google.com/identity/protocols/oauth2#expiration).
+1. Open [Google Cloud Console](https://console.cloud.google.com/), create or select a project.
+2. Go to **APIs & Services → Library**, find **Gmail API**, and click **Enable**.
+3. Open **Google Auth Platform** and complete the app name and contact details. For a personal account, choose **External**; while in Testing, add the receiving Gmail account under **Audience → Test users**.
+4. Under **Clients**, create an OAuth client with type **Desktop app**, then download its JSON file.
 
-</details>
+This JSON identifies your private Google app. Keep it private. A regular API key or a Web application client will not work. [Google desktop authorization](https://developers.google.com/identity/protocols/oauth2/native-app).
 
-### Already set up?
+#### 3. Connect Gmail and Notion
 
-**Web:** open your bookmark → choose **Start date / End date** → **Check and preview** → **Import new applications**. Keep the page open until it finishes. Next time, use the same bookmark; no redeployment or Codex needed.
-
-**Terminal:** run this from the project folder, review the preview, then type **IMPORT** to confirm:
+In the project folder, run:
 
 ```sh
+node cli.mjs setup
+```
+
+Follow the prompts:
+
+1. Paste the downloaded JSON file's full path **without surrounding quotes**.
+2. Open the printed Google sign-in link in a browser **on the same computer**. Sign in to the receiving account and approve read-only Gmail access.
+3. Return to the terminal. Paste your **Notion secret** (input is hidden), then your **database link**, prepared above. Select the table if asked.
+
+When you see **Setup complete**, you are ready. Settings stay in the Git-ignored `.local/` folder.
+
+**Testing-mode login expires after seven days** for this Gmail scope. If login expires or is revoked, run `node cli.mjs setup` and choose to reconnect Gmail. [Google token expiration](https://developers.google.com/identity/protocols/oauth2#expiration).
+
+#### 4. Preview and import
+
+Run these from the same project folder, replacing the dates with yours:
+
+```sh
+node cli.mjs preview --start 2026-10-01 --end 2026-10-03
 node cli.mjs import --start 2026-10-01 --end 2026-10-03
 ```
 
-Use `preview` instead of `import` to check without adding records.
+`preview` adds nothing to Notion. `import` shows a fresh preview, then waits for you to type **IMPORT** before adding records. It checks for duplicates again after confirmation.
 
-Dates refer to **when the emails arrived**, including both selected days in your local timezone. Leave a date blank (or omit its terminal option) for no bound. Notion's Apply Date comes from the email. There is no fixed total email cap; this is a manual tool, so keep the page/process running.
+**Next time:** open a terminal in this folder and run the command. Keep the process running and your computer awake until completion. No Apps Script deployment or Codex needed. For help, run `node cli.mjs help`.
+
+### Dates and results — both methods
+
+- Dates filter **when the email arrived**, including both selected days in the browser/computer's timezone. **Apply Date** uses the application date inside the email.
+- Leave either web date blank, or omit `--start` / `--end`, for no bound. Omit both to search all supported confirmations.
+- **Ready to import:** can be added. **Already exists:** skipped. **Needs review:** check manually; it will not be imported.
+- This is a manual importer, not background sync. Do not run the web and terminal importers at the same time against the same database.
+
+### Privacy and template
+
+The web version saves credentials in your private Apps Script project. The terminal version saves them as plaintext files under `.local/`, protected by local file permissions where supported. Keep that folder, downloaded OAuth JSON, backups, and application output private. `.gitignore` excludes private files; never force-add them.
+
+You may create your own database or obtain [Niko's Job Tracker template](https://www.notion.com/templates/job-tracker-the-ultimate-job-search-companion) from its original page. **This repository distributes the importer, not the template.** The earlier review (2026-10-03) found no explicit redistribution license; free access does not establish permission to republish it. Obtain the creator's permission before distributing a template copy. [Notion Marketplace terms](https://www.notion.com/help/template-gallery-guidelines-and-terms).
 
 <details>
-<summary>Help, updates, and error recovery</summary>
+<summary>Troubleshooting, updates, and recovery</summary>
 
-| Problem | What to check |
+| Problem | What to do |
 |---|---|
-| `Gmail is not defined` | Add Gmail API v1 under Services and deploy a new version. |
-| No emails found | Receiving Google account, selected dates, and supported confirmation subject. |
-| Notion 401 | Reconnect using a valid secret. |
-| Notion 403 / 404 | Database Connections, workspace, and original database link. |
-| Property type mismatch | Match the five properties in the setup table. |
-| Preview expired | Preview again. Tickets last approximately 30 minutes; Google may evict cached items sooner. |
-| Long processing or quota error | Wait for the quota to reset, or use a shorter range for timeouts. Preview again to check completed records. |
-| Old preview fails after changing databases | Preview again to avoid writing to the wrong destination. |
+| `Gmail is not defined` | Add Gmail API v1 under Apps Script Services; deploy a new version. |
+| No matching emails | Check the receiving account, receipt dates, and supported email format. |
+| Notion 401 | Reconnect with a valid secret. |
+| Notion 403 / 404 | Check database Connections, workspace, access limits, and the original database link. |
+| Wrong property type | Match the Notion table above. |
+| Expired web preview or changed database | Preview again. |
+| Quota reached / timeout | Wait for quota recovery; for timeouts, use a smaller date range. Preview again to check completed records. |
+| CLI Google login expired | Run `node cli.mjs setup` and reconnect Gmail. |
 
-#### Update the web app
+**Update the web app:** replace Apps Script's `Code.gs` with the latest `SingleFile.gs`, use the latest `appsscript.json`, then **Deploy → Manage deployments → Edit → New version → Deploy**. Refresh the original URL. Saving alone does not update a deployment; existing Notion settings remain.
 
-1. Replace Apps Script's `Code.gs` with the latest `SingleFile.gs`; do not append a second copy.
-2. Use the latest `appsscript.json`. An old `Index.html` may remain, but the packaged version does not use it.
-3. Choose **Deploy → Manage deployments → Edit (pencil) → New version → Deploy**.
-4. Refresh your existing tool URL. Saving code alone does not update the deployed version.
+**Update the terminal version:** update the project files while preserving `.local/`.
 
-Existing Notion settings can be reused.
+**Interrupted imports:** completed records remain in Notion. Preview again before importing. An uncertain write keeps a `pending` marker to avoid blindly creating a duplicate. If it remains Needs review, check Notion manually. Only after confirming no page exists, stop the tool, privately back up its settings, and remove that single marker: `job:source:job-id` in web Script Properties, or `source:job-id` in `.local/ledger.json`. Never clear the whole ledger.
 
-#### Terminal recovery
+**Local file errors:** after a crash, confirm the old process has stopped before removing a stale `.local/run.lock`. Preserve and inspect any `*.json.tmp` and its corresponding JSON before removing temporary files. Locks and pending records are separate across local copies and Apps Script.
 
-The CLI saves credentials and Google login tokens in `.local/client.json`, `.local/google.json`, and `.local/config.json`. These files are plaintext protected by local file permissions, not encrypted storage. The directory is ignored by Git, with owner-only permissions on systems that support them. Protect your operating-system account and backups. Terminal results contain your application data; do not upload captured output.
+**Supported messages:** English “Your application was sent to” / “Your application has been sent to” and Traditional Chinese application confirmations. Simplified Chinese, HTML-only messages, and other layouts may not parse. Ambiguous dates are flagged for review. Duplicate checks prioritize LinkedIn job ID, then company, position, and date. English parsing and CLI workflows use synthetic tests; real desktop OAuth/account access still needs your own setup.
 
-`.local/ledger.json` keeps job identifiers and pending/completed write markers. If a network failure occurs after Notion may have accepted a page, the CLI stops and retains `pending`; it does not blindly retry that write. Preview again: records already found in Notion are skipped. If a pending job is still marked **Needs review**, check Notion manually. Only after confirming the page does not exist, stop the tool, privately back up the ledger, and remove that one `data-source-id:job-id` entry before trying again. Never erase the whole ledger to resolve an error.
-
-Only one command can run per local folder. After a forced termination, first ensure the old process has stopped, then remove only `.local/run.lock` if it remains. A leftover `*.json.tmp` means a settings write was interrupted; preserve the files for review, and only remove a temporary file after checking its corresponding JSON. Do not run multiple copies or the web importer concurrently: their locks and pending markers are separate, so cross-process duplicate prevention is not guaranteed.
-
-The CLI has automated tests with synthetic Gmail/Notion responses, including pagination, date boundaries, duplicate imports, expired access tokens, throttling, and uncertain writes. Real desktop OAuth and end-to-end account access require your own local setup.
-
-#### Email support and duplicate checks
-
-- Supports Traditional Chinese “您的應徵資料已傳送到” and English “Your application was sent to” / “Your application has been sent to” confirmations. Simplified Chinese is not searched.
-- English dates support the labels Date applied, Applied on, and Application date, with English month names or ISO dates. Ambiguous numeric dates are flagged for review rather than guessed.
-- Traditional Chinese parsing was previously checked against real messages; English parsing uses synthetic tests. Other subjects, HTML-only emails, or different layouts may not be supported.
-- Duplicate detection prioritizes the LinkedIn job ID, then compares company, position, and date. Cross-batch duplicates are checked again during import.
-- If a batch fails, subsequent imports stop. Completed results remain visible; preview again to check progress. Processing is subject to service quotas, and there is no automatic background resume.
-- An uncertain write failure retains a pending marker instead of blindly retrying. For the web version, check Notion first; only if the record definitely was not created should you remove the matching `job:source:job-id` marker from Script Properties. For the CLI, follow Terminal recovery above.
-- The web execution lock covers one Apps Script project; the CLI lock covers one local folder. Never run these importers concurrently against the same database.
+**Service limits:** the CLI paces requests and retries temporary rate limits a bounded number of times. Persistent errors stop processing. There is no automatic background resume or CLI preview expiry. Actual quotas and pricing depend on your providers; the tool does not enable billing or purchase extra quota.
 
 </details>
 
 <details>
-<summary>API limits, privacy, template credit, and development</summary>
+<summary>For developers</summary>
 
-#### API limits
-
-Both methods use Gmail and Notion APIs. Gmail has project/user quotas, and actual limits depend on the Cloud project. Notion has per-connection and shared workspace limits; Free/Plus connections currently allow 180 requests/minute. Other account and payload limits also apply. The CLI paces requests and waits on temporary rate limits with bounded retries; persistent failures stop the run. [Gmail quotas](https://developers.google.com/workspace/gmail/api/reference/quota), [Notion limits](https://developers.notion.com/reference/request-limits). Checked 2026-10-04; consult current provider limits and pricing before large imports. This tool does not enable billing or buy extra quota.
-
-#### Template credit
-
-[Job Tracker: The Ultimate Job Search Companion](https://www.notion.com/templates/job-tracker-the-ultimate-job-search-companion) is an optional template by **Niko**. Obtain it from the creator's original listing for use in your workspace, or create your own empty database with the five required properties.
-
-This repository contains an independent importer and its required property configuration. It does not distribute the template's pages, layout, images, copy, exports, or a redistributable template copy, and is not endorsed by the creator or Notion.
-
-Public information was checked on **2026-10-03**. No explicit permission to repackage, redistribute, or open-source this template was found on the listing or linked creator store. Free availability does not establish those rights. The [Notion Marketplace terms](https://www.notion.com/help/template-gallery-guidelines-and-terms) retain creators' ownership and grant end users access and use rights. Their explicit prohibition on reposting purchased creator content does not by itself settle the treatment of every free template.
-
-The repository links to the original template rather than redistributing it. Obtain explicit permission from the creator before publishing the template itself or a modified copy. The listing includes an **Email the creator** contact link. This is a practical assessment of public information, not a licensing confirmation from the creator.
-
-#### Privacy and development
-
-The repository contains no private accounts, Notion IDs, credentials, real emails, application records, or private screenshots. `.gitignore` uses a reviewed file allowlist; tracked files still require content review.
-
-Web changes go in `Code.gs` and `Index.html`; CLI changes go in `cli.mjs` and `lib/`. The shared parser is in `Code.gs`. Regenerate the web package after shared or web changes, then test:
+Web source: `Code.gs`, `Index.html`. Terminal source: `cli.mjs`, `lib/`. Both reuse the parser in `Code.gs`. After shared/web changes, rebuild the generated `SingleFile.gs`:
 
 ```sh
 python3 scripts/build-single.py
@@ -195,14 +181,9 @@ git config core.hooksPath scripts
 python3 scripts/check-private.py
 ```
 
-Commit/push checks scan tracked content and history, not account folders on your computer. Automated scanning cannot guarantee complete privacy; review changes before committing. `SingleFile.gs` is the generated app used for deployment.
+The privacy checker allowlists reviewed files and scans tracked content/history. It does not scan account folders or guarantee the absence of every secret; review your changes before committing.
 
-#### Official documentation
-
-- [Google web app deployment](https://developers.google.com/apps-script/guides/web)
-- [Google manifest settings](https://developers.google.com/apps-script/guides/manifest)
-- [Gmail API service](https://developers.google.com/apps-script/advanced/gmail)
-- [Notion authorization](https://developers.notion.com/guides/get-started/authorization)
+References: [Apps Script deployment](https://developers.google.com/apps-script/guides/web), [manifest](https://developers.google.com/apps-script/guides/manifest), [Gmail service](https://developers.google.com/apps-script/advanced/gmail), [Notion authorization](https://developers.notion.com/guides/get-started/authorization).
 
 </details>
 
@@ -210,191 +191,174 @@ Commit/push checks scan tracked content and history, not account folders on your
 
 ## 繁體中文
 
-**把 Gmail 裡的 LinkedIn 申請確認信，整理到你的 Notion 求職紀錄。**
+把 **Gmail 裡的 LinkedIn 申請確認信，匯入 Notion 求職紀錄**。選擇收信日期、預覽結果，確認後再匯入。
 
-選日期 → 預覽 → 匯入。會填入 **Company、Position、Status、Website、Apply Date**，檢查重複，並保留既有申請的狀態。
+工具填入 **Company、Position、Status、Website、Apply Date**，檢查重複，新增狀態設為 `Applied`，並保留既有紀錄。支援**英文與繁體中文信件**，介面與操作提示皆為英文。
 
-支援**英文與繁體中文信件**，操作介面是英文。不需要 OpenAI API 金鑰。
+### 選一種執行方式
 
-### 選一種方式就好
-
-| | 適合誰 | 第一次要做什麼 |
+| | 網頁版 | 終端機版 |
 |---|---|---|
-| **網頁版（建議）** | 想開書籤、按按鈕使用 | 把兩個檔案貼到 Google Apps Script，連接 Notion |
-| **終端機版** | 想在電腦上跑較長的匯入 | 安裝 Node.js 22+、授權 Gmail、連接 Notion |
+| 跑在哪裡 | 你的 Google 帳號，使用 Google Apps Script | 你的電腦，使用 Node.js |
+| 怎麼使用 | 開書籤、按按鈕 | 輸入指令 |
+| 要安裝什麼 | 把兩個檔案貼進 Apps Script 專案 | Node.js 22+ 與本儲存庫 |
+| 適合用途 | 日常匯入，不必在電腦裝軟體 | 較長的匯入，首次 Gmail 設定較多 |
 
-**先說限制：** Apps Script 有[每次伺服器執行 6 分鐘與每日配額限制](https://developers.google.com/apps-script/guides/services/quotas)。終端機版免除這些 Apps Script 限制，但**兩種方式仍有 Gmail／Notion API 配額**。
+**選一種即可，不必兩種都裝。** 都不需要 OpenAI、ChatGPT 或 Codex API 金鑰。Google Apps Script 是 Google 提供的程式執行服務；GitHub 只是放原始碼，不會執行工具，也不會自動更新你部署的版本。
 
-### 第一次使用
+**先說限制：** Apps Script 有[每次伺服器執行 6 分鐘與每日配額限制](https://developers.google.com/apps-script/guides/services/quotas)。網頁版每批讀 20 封，因此整次操作可以超過六分鐘。終端機版免除 Apps Script 限制，但**兩種方式仍受 [Gmail](https://developers.google.com/workspace/gmail/api/reference/quota)／[Notion](https://developers.notion.com/reference/request-limits) API 配額限制**。沒有固定總筆數上限，也不能保證每天可跑幾次。
 
-先設定 Notion，再展開你要用的那一種方式即可。
+### 先準備 Notion（兩種方式都需要，只做一次）
 
-<details>
-<summary>1. 連接 Notion（兩種方式都需要）</summary>
+可沿用求職表格，或建立新的 Notion 資料庫，確認**欄位名稱與類型完全相符**：
 
-1. 在自己的 Notion 建立空白表格，或從本文「模板來源」中的原作者連結取得模板。
-2. 確認表格有以下五個欄位，名稱、大小寫及類型需相符：
-
-| 欄位 | 類型 | 用途 |
+| 欄位 | 類型 | 存什麼 |
 |---|---|---|
-| Company | 標題 / Title | 公司名稱（可將 Name 改名） |
-| Position | 文字 / Text | 職位 |
-| Status | 選取 / Select | 需包含 `Applied` 選項 |
-| Website | 文字 / Text | 可點擊的職缺連結 |
-| Apply Date | 日期 / Date | 應徵日期 |
+| Company | 標題 / Title | 公司名稱 |
+| Position | 文字 / Text | 職位名稱 |
+| Status | 選取 / Select，包含 `Applied` 選項 | 初始申請狀態 |
+| Website | 文字 / Text | 可點擊的 LinkedIn 職缺連結 |
+| Apply Date | 日期 / Date | 信內應徵日期 |
 
-`Status` 不是 Notion 的 Status 類型；Position 和 Website 都使用文字類型。修改模板副本的欄位前請先檢查內容，工具不會自行改欄位。
+`Status` 要用 **Select**，不是 Notion 的 Status 類型；Position、Website 都用 **Text**。工具不會替你修改表格結構。
 
-3. 開啟 [Notion integrations](https://www.notion.so/profile/integrations)，建立 **Internal integration / Internal connection**，名稱可填「申請紀錄小幫手」，選擇資料庫所在的工作區。
-4. 能力設定開啟 **Read content（讀取）** 和 **Insert content（新增）**，複製 **Internal Integration Secret**。這就是下個步驟要貼的「Notion 連線密鑰」。
-5. 回到 Notion 的**原始資料庫**，右上角 `…` → **Connections / 連線** → 加入剛建立的連線。只建立連線但沒有授權資料庫，工具仍無法使用。
-6. 將原始表格 **開啟為整頁 / Open as full page**，用 `…` → **複製連結 / Copy link**。
+1. 開啟 [Notion integrations](https://www.notion.so/profile/integrations)，建立 **Internal integration / Internal connection**，選資料庫所在的工作區。
+2. 開啟 **Read content（讀取）**、**Insert content（新增）**，複製 **Internal Integration Secret**。這就是工具要你貼的 Notion 密鑰。
+3. 回 Notion 開啟原始資料庫 → `…` → **Connections / 連線**，加入剛建立的連線。
+4. 將資料庫**開啟為整頁**並複製連結。若使用 **Job Finder → Job Tracker**，要複製 **Job Tracker 資料庫**的連結。
 
-若使用 Job Finder 裡的 Job Tracker，請取得真正儲存紀錄的 Job Tracker 資料庫連結；不要複製 Job Finder 外層頁面或一個職缺列的連結。連結檢視應開啟其原始資料庫。
+完成後，你手上應有兩樣東西：**Notion 密鑰、資料庫連結**。之後換另一種執行方式也能沿用。
 
-</details>
+### 方法一：網頁版
 
-<details>
-<summary>2A. 安裝網頁版（建議）</summary>
+**這是在你的 Google 帳號裡建立一份私人網頁工具。** 準備瀏覽器、收到申請信的 Google 帳號，以及上面的 Notion 資料即可。
 
-#### 放入程式
+#### 1. 貼入兩個檔案
 
-1. 用**收到 LinkedIn 確認信的 Google 帳號**開啟 [Google Apps Script](https://script.google.com/home/start)，按 **新增專案 / New project**。
-2. 將專案改名為「申請紀錄小幫手」。
-3. 在 GitHub 開啟 [SingleFile.gs](SingleFile.gs)，按 **Raw**，複製全部文字。
-4. 回到 Apps Script，選左側 `Code.gs`，刪掉預設的 `myFunction`，貼上剛才的全部文字並儲存。**不用另外建立 Index.html，也不要同時貼入其他 .gs 檔。**
-5. 點左側齒輪 **專案設定 / Project Settings**，勾選「在編輯器中顯示 appsscript.json 資訊清單檔案」。
-6. 回編輯器，點 `appsscript.json`，用 GitHub 的 [appsscript.json](appsscript.json) 全部內容取代並儲存。這份設定讓 Gmail 授權保持唯讀。
-7. 確認左側 **服務 / Services** 有 **Gmail API**。若沒有，按 `+` → Gmail API → v1 → 新增，識別符保持 `Gmail`。
+1. 用收信的 Google 帳號開啟 [Google Apps Script](https://script.google.com/home/start)，按 **New project / 新增專案**，命名為「Application Tracker」。
+2. 開啟本儲存庫的 [SingleFile.gs](SingleFile.gs) → **Raw**，複製全部內容。回 Apps Script，用它完整取代 `Code.gs` 內容並儲存。
+3. 點齒輪 **Project Settings / 專案設定**，勾選「在編輯器中顯示 appsscript.json 資訊清單檔案」。
+4. 回編輯器，用本儲存庫的 [appsscript.json](appsscript.json) 完整取代專案的 `appsscript.json`，儲存。
+5. 確認 **Services / 服務** 有 **Gmail API**。沒有的話，按 `+` → **Gmail API → v1 → 新增**，識別符保留 `Gmail`。
 
-你只需要貼上兩個檔案：整合程式與權限設定。README 中的其他程式檔是給開發者維護用的。
+`SingleFile.gs` 是程式和介面；`appsscript.json` 是權限設定。**不必貼入其他程式檔，也不必另建 HTML 檔。**
 
-#### 取得工具網址
+#### 2. 取得自己的工具網址
 
-1. 按右上角 **部署 / Deploy → 新增部署 / New deployment**。
-2. 在「選取類型」旁的齒輪選 **網頁應用程式 / Web app**。
-3. **執行身分 / Execute as** 選 **我 / Me**。
-4. **誰可以存取 / Who has access** 選 **僅限自己 / Only myself**。
-5. 按 **部署**。若要求授權，按 **授權存取 / Authorize access**，選收信的 Google 帳號，確認 Gmail 唯讀與外部連線權限後完成授權。
-6. 複製部署結果中的 **網頁應用程式網址 / Web app URL**，開啟並加入書籤。之後用這個網址操作。
+1. 按 **Deploy / 部署 → New deployment / 新增部署**，類型選 **Web app / 網頁應用程式**。
+2. **Execute as / 執行身分** 選 **Me / 我**；**Who has access / 誰可以存取** 選 **Only myself / 僅限自己**。
+3. 按 **Deploy → Authorize access / 授權存取**，選收信帳號，允許 Gmail 唯讀與外部連線權限。
+4. 開啟產生的 **Web app URL / 網頁應用程式網址**，加入書籤。
 
-若 Google 顯示未驗證提示，先確認是自己建立的專案及正確程式；來源不明的應用不要授權。組織帳號若被管理政策阻擋，需由管理員處理。使用自訂 Cloud 專案時也需在該專案啟用 Gmail API。
+若 Google 顯示未驗證提示，先確認是自己的專案與正確程式，再繼續。組織帳號限制可能需管理員處理；使用自訂 Cloud 專案時，也需啟用 Gmail API。
 
-#### 連接 Notion
+#### 3. 連接並使用
 
-1. 打開剛才保存的工具網址，展開 **Set up or change Notion connection**。
-2. 貼上 **Notion connection secret**與**Database link**，按 **Connect Notion**。
-3. 工具會自動找出資料來源並驗證欄位；若資料庫有多個來源，選擇對應表格後再按一次連接。
-4. 看到已連接後即可使用。不必找 data source ID，也不必進入指令碼屬性手動填設定。
+1. 在工具頁展開 **Set up or change Notion connection**。
+2. 貼上 **Notion connection secret** 與 **Database link**，按 **Connect Notion**。若要求選表格，選好後再按一次。
+3. 選 **Start date / End date** → **Check and preview**。
+4. 檢查結果 → **Import new applications**，保持頁面開啟直到完成。
 
-密鑰只透過自己的 Apps Script 傳送到 Notion 以驗證，驗證成功後保存在私人 Apps Script 專案設定；不會寫入 GitHub 或回傳到預覽結果。密鑰欄會清空。不要將專案分享給不應存取資料的人，也不要上傳設定畫面的截圖。
+**下次使用：** 開同一個書籤就好，不必重新部署，也不必開 Codex。預覽約 30 分鐘會過期，也可能提前被清除，預覽後就接著匯入。
 
-</details>
+### 方法二：終端機版
 
-<details>
-<summary>2B. 安裝終端機版</summary>
+**這是在自己的電腦執行工具。** 需要另外做一次 Google 登入設定，不使用 Apps Script 的部署。
 
-1. 安裝 [Node.js](https://nodejs.org/en/download) **22 或更新版本**。在 GitHub 按 **Code → Download ZIP** 並解壓縮，或自行 clone。用終端機進入儲存庫資料夾，保留整個資料夾內容；CLI 會共用 `Code.gs` 的解析規則。**不需要執行 npm install。**
-2. 到 [Google Cloud Console](https://console.cloud.google.com/) 建立／選擇自己的專案並啟用 **Gmail API**。在 Google Auth Platform 設定應用名稱與聯絡資料；個人帳號選 External，Testing 階段將收信的 Gmail 帳號加入測試使用者。
-3. 在 **Clients** 建立 **Desktop app** 類型的 OAuth 用戶端，下載 JSON 並妥善保管，不能上傳 GitHub。網頁類型憑證與一般 API key 不適用。CLI 只請求 `gmail.readonly`。[Google 桌面授權說明](https://developers.google.com/identity/protocols/oauth2/native-app)。
-4. 按上方「1. 連接 Notion」準備相同五個 Notion 欄位，建立具 Read content／Insert content 權限的私人連線，並授權原始資料庫。準備密鑰與資料庫連結。可沿用既有 Notion 連線；CLI 不會自動取得 Apps Script 裡的設定。
-5. 執行：
+#### 1. 安裝並開啟專案
 
-   ```sh
-   node cli.mjs setup
-   ```
+1. 安裝 [Node.js 22 或更新版本](https://nodejs.org/en/download)。
+2. 在此 GitHub 儲存庫按 **Code → Download ZIP**，解壓縮。
+3. 開啟「終端機」（macOS／Linux）或 PowerShell（Windows）。輸入 `cd `，接著輸入加上引號的解壓縮資料夾路徑，按 Enter；進入的資料夾應包含 `cli.mjs`。
+4. 執行 `node --version`，確認 Node.js 已安裝。
 
-6. 依提示貼入 Google JSON 的完整路徑，**不加前後引號**。在**同一台電腦**的瀏覽器開啟終端機顯示的 Google 登入連結，允許 Gmail 唯讀存取。程式只在本機 loopback 位址接收登入結果。回到終端機，貼上 Notion 密鑰（輸入不顯示），再貼原始資料庫連結。多個資料來源時選正確表格。
+保留整個專案資料夾。**不用執行 `npm install`。**
 
-設定保存在儲存庫的 `.local/`。密鑰不放在指令參數，因此不會被記到 shell 指令歷史。原本下載的 OAuth JSON 仍是私人檔案；設定成功後可安全保管或刪除那份多餘副本。
+#### 2. 允許本機工具讀 Gmail
 
-**Google Testing 模式提醒：** External 專案在 Testing 時，這個 Gmail 權限的 refresh token 七天會過期。需要時重跑 `node cli.mjs setup` 並選擇重新連接 Gmail。撤銷授權與帳號政策也可能要求重新登入。改成正式發布須遵守 Google 規定，工具不會繞過驗證。[Google token 到期說明](https://developers.google.com/identity/protocols/oauth2#expiration)。
+1. 開啟 [Google Cloud Console](https://console.cloud.google.com/)，建立或選擇一個專案。
+2. 到 **APIs & Services → Library**，搜尋 **Gmail API**，按 **Enable / 啟用**。
+3. 開啟 **Google Auth Platform**，填應用名稱與聯絡資料。個人帳號選 **External**；Testing 階段在 **Audience → Test users** 加入收信的 Gmail 帳號。
+4. 到 **Clients** 建立 OAuth 用戶端，類型選 **Desktop app**，下載 JSON 檔案。
 
-</details>
+這份 JSON 用來識別你自己的 Google 應用，請私下保管。一般 API key 或 Web application 類型不能代替。[Google 桌面授權文件](https://developers.google.com/identity/protocols/oauth2/native-app)。
 
-### 設定好了，平常怎麼用？
+#### 3. 連接 Gmail 和 Notion
 
-**網頁版：** 開書籤 → 選 **Start date / End date** → **Check and preview** → **Import new applications**。等完成後就能關閉，下次開同一個書籤，不必重新部署，也不必開 Codex。
-
-**終端機版：** 在專案資料夾執行，檢查預覽後輸入 **IMPORT** 確認：
+在專案資料夾執行：
 
 ```sh
+node cli.mjs setup
+```
+
+依序完成提示：
+
+1. 貼入剛下載 JSON 檔案的完整路徑，**這裡不加前後引號**。
+2. 在**同一台電腦**的瀏覽器開啟終端機顯示的 Google 登入連結，選收信帳號，允許 Gmail 唯讀存取。
+3. 回終端機，貼入上面準備的 **Notion 密鑰**（輸入不顯示），再貼**資料庫連結**。若有多個表格，選正確的那個。
+
+看到 **Setup complete** 就完成了。設定保存在 Git 忽略的 `.local/` 資料夾。
+
+**Testing 模式的 Gmail 登入七天會過期。** 到期或授權被撤銷時，重跑 `node cli.mjs setup` 並選擇重新連接 Gmail。[Google token 到期說明](https://developers.google.com/identity/protocols/oauth2#expiration)。
+
+#### 4. 預覽與匯入
+
+在同一個專案資料夾執行，日期換成你要查的範圍：
+
+```sh
+node cli.mjs preview --start 2026-10-01 --end 2026-10-03
 node cli.mjs import --start 2026-10-01 --end 2026-10-03
 ```
 
-只想預覽，把 `import` 改成 `preview` 即可。
+`preview` 只預覽，不新增 Notion 紀錄。`import` 會重新預覽，等你輸入 **IMPORT** 才新增，確認後還會再次去重。
 
-日期依**收信時間**與本機時區，包含開始／結束兩天。留空或省略某端參數，就不限該端。Notion 的 Apply Date 仍使用信內應徵日期。沒有固定總筆數上限；操作時保持頁面或程式開啟，沒有背景自動同步。
+**下次使用：** 在此資料夾開終端機、執行指令即可。保持程式執行、電腦喚醒，直到完成；不必部署 Apps Script，也不必開 Codex。查指令可用 `node cli.mjs help`。
+
+### 日期與結果（兩種方式相同）
+
+- 日期篩選的是**收到信的時間**，依瀏覽器／電腦時區，包含開始與結束整天。**Apply Date** 則採用信裡的應徵日期。
+- 網頁日期留空，或省略 `--start`／`--end`，表示不限該端；兩端都不設就查所有支援的歷史確認信。
+- **Ready to import**：可新增。**Already exists**：跳過。**Needs review**：要手動核對，不會匯入。
+- 這是手動匯入工具，沒有背景同步。不要同時用網頁與終端機對同一資料庫匯入。
+
+### 隱私與模板
+
+網頁版的密鑰存於私人 Apps Script 專案；終端機版存於 `.local/` 明文檔案，使用系統支援的本機權限保護。請保護該資料夾、下載的 OAuth JSON、備份與求職輸出。`.gitignore` 會排除私人檔案，不要強制加入 Git。
+
+可自行建表格，或從原始頁面取得 [Niko 的 Job Tracker 模板](https://www.notion.com/templates/job-tracker-the-ultimate-job-search-companion)。**本儲存庫提供匯入工具，不散布模板副本。** 先前查核（2026-10-03）未找到明確再散布授權；免費取得不代表可以重新發布模板。若要散布副本，先取得作者許可。[Notion Marketplace 條款](https://www.notion.com/help/template-gallery-guidelines-and-terms)。
 
 <details>
-<summary>遇到問題、更新版本與錯誤恢復</summary>
+<summary>除錯、更新與錯誤恢復</summary>
 
 | 問題 | 處理方式 |
 |---|---|
-| Gmail is not defined | 在服務加入 Gmail API v1，並部署新版本。 |
-| 沒有信件 | 確認部署使用收信帳號、日期正確，且主旨是繁中或英文的申請已送出確認信。 |
-| Notion 401 | 密鑰無效或已撤銷，重新連接。 |
-| Notion 403／404 | 檢查資料庫的 Connections、工作區與原始資料庫連結。 |
-| 欄位類型不符 | 依「1. 連接 Notion」的表格修正自己的資料庫欄位。 |
-| 預覽過期 | 重新預覽；分批預覽憑證約 30 分鐘有效，Google 也可能提早清除快取。 |
-| 長時間處理或配額錯誤 | 配額用完需等待重設；超時可縮小日期範圍。重新預覽核對已完成項目。 |
-| 換資料庫後無法匯入舊預覽 | 重新預覽，避免誤寫到不同的資料庫。 |
+| `Gmail is not defined` | 在 Apps Script 服務加入 Gmail API v1，再部署新版本。 |
+| 沒有找到信 | 確認收信帳號、收信日期與支援的信件格式。 |
+| Notion 401 | 用有效密鑰重新連接。 |
+| Notion 403／404 | 檢查資料庫 Connections、工作區、存取限制與原始資料庫連結。 |
+| 欄位類型不符 | 依上方 Notion 表格修正。 |
+| 網頁預覽過期或換過資料庫 | 重新預覽。 |
+| 配額用完／超時 | 等待配額恢復；超時可縮小日期範圍。重新預覽核對完成項目。 |
+| CLI Google 登入過期 | 重跑 `node cli.mjs setup`，重新連接 Gmail。 |
 
-#### 更新網頁版
+**更新網頁版：** 用最新 `SingleFile.gs` 取代 Apps Script 的 `Code.gs`，使用最新 `appsscript.json`，再按 **部署 → 管理部署 → 編輯 → 新版本 → 部署**。重新整理原網址；只儲存不會更新部署，原 Notion 設定可沿用。
 
-1. 用新版 `SingleFile.gs` 完整取代 Apps Script 的 `Code.gs`。不要和原來的程式重複貼上。
-2. 使用新版 `appsscript.json`。舊的 `Index.html` 可保留，但整合版不會使用它。
-3. 按 **部署 → 管理部署 → 鉛筆編輯 → 版本選「新版本」→ 部署**。
-4. 重新整理原本工具網址。只按儲存不會更新正式部署。
+**更新終端機版：** 更新專案程式檔，保留 `.local/`。
 
-原本存在的 Notion 指令碼屬性仍可沿用，不需要重新連接。
+**匯入中斷：** 已完成的紀錄仍在 Notion，重新預覽再匯入。不確定是否寫入成功時，程式保留 `pending` 標記，避免盲目新增。若仍顯示 Needs review，先手動查 Notion。只有確定沒建立時，才停止工具、私下備份設定，刪除那一筆標記：網頁版在 Script Properties 的 `job:來源:職缺ID`；CLI 在 `.local/ledger.json` 的 `來源:職缺ID`。不要整份清空。
 
-#### 本機錯誤恢復
+**本機檔案錯誤：** 當機後先確認舊程序已停止，再刪除殘留 `.local/run.lock`。若有 `*.json.tmp`，先保留並檢查對應 JSON，再處理暫存檔。不同本機副本與 Apps Script 的鎖、pending 紀錄各自獨立。
 
-`.local/client.json`、`.local/google.json`、`.local/config.json` 保存密鑰與登入憑證。它們是靠本機權限保護的明文檔案，並非加密保管庫；支援的系統會設為僅擁有者可讀寫。整個 `.local/` 都被 Git 忽略，仍請保護作業系統帳號與備份。終端機結果包含你的求職資料，不要上傳輸出截圖或紀錄。
+**信件支援：** 英文「Your application was sent to／Your application has been sent to」與繁體中文申請確認信。不支援簡體中文；純 HTML 或其他排版可能無法解析。含糊日期會列為待確認。去重優先比 LinkedIn 職缺 ID，再比公司、職位、日期。英文解析與 CLI 流程以虛構資料測試，真實桌面 OAuth／帳號仍須完成自己的設定後驗證。
 
-`.local/ledger.json` 保存職缺識別與 pending／完成標記。若 Notion 可能已成功寫入、但網路回應失敗，程式停止並保留 pending，不會盲目重送。重新預覽時，Notion 已有的會跳過。若仍顯示 Needs review，先到 Notion 核對；只有確定沒有建立，才停止程式、私下備份 ledger，刪除該筆 `資料來源ID:職缺ID` 項目再重試。不要整份刪除。
-
-同一資料夾一次只允許一個指令。強制中斷後，先確認舊程序已停止，再刪除殘留的 `.local/run.lock`。若有 `*.json.tmp`，代表設定寫入曾中斷；先保留檢查，確認對應 JSON 狀態後才移除暫存檔。**不要同時跑多份 CLI 或網頁版**，它們的鎖與 pending 紀錄各自獨立，不能保證跨程序去重。
-
-CLI 已用虛構 Gmail／Notion 回應測試分頁、日期邊界、重複匯入、登入更新、限流及不確定寫入。真正的桌面 OAuth 與帳號全流程仍須完成你自己的本機設定後驗證。
-
-#### 支援信件與去重方式
-
-- 只支援繁體中文「您的應徵資料已傳送到」與英文「Your application was sent to／Your application has been sent to」確認信；不搜尋簡體中文。
-- 英文日期支援 Date applied、Applied on、Application date 標籤，以及月份英文名稱或 ISO 日期。含糊數字日期不猜測，列為待確認。
-- 繁中先前曾以實際信件驗證；英文以虛構樣本測試。其他主旨、純 HTML 或不同排版可能不支援。
-- 相同 LinkedIn 職缺編號優先判定重複，另比對公司、職位與日期。跨批次重複會在匯入時再次檢查。
-- 一批失敗會停止後續匯入，畫面保留已完成結果。重新預覽可核對進度；工具不承諾無限量或自動背景續傳。
-- 不明確的寫入錯誤保留 pending 標記，不直接重試。網頁版先到 Notion 確認，只有確定未建立時才在指令碼屬性刪除對應 `job:資料來源:職缺編號` 標記；CLI 請依上方「本機錯誤恢復」處理。
-- 網頁鎖僅涵蓋同一 Apps Script 專案，本機鎖僅涵蓋同一資料夾；請勿同時對同一資料庫執行多份匯入工具。
+**服務限制：** CLI 控制請求速度，遇暫時限流會有限次重試，持續失敗會停止。沒有背景自動續跑；CLI 沒有預覽到期期限。實際配額與計價依服務商規定，工具不會替你開付費或購買配額。
 
 </details>
 
 <details>
-<summary>API 配額、隱私、模板來源與開發說明</summary>
+<summary>開發者說明</summary>
 
-#### API 配額
-
-Gmail 有專案與使用者配額，實際額度依 Cloud 專案而定。Notion 有連線與工作區共享限制；Free／Plus 連線目前為每分鐘 180 次請求，也有其他帳號與內容大小限制。本機版會控制速度，遇暫時限流會等待並有限次重試，持續失敗則停止。[Gmail 配額](https://developers.google.com/workspace/gmail/api/reference/quota)、[Notion 限制](https://developers.notion.com/reference/request-limits)。查核日期：2026-10-04；大量匯入前請查看當時配額與計價。工具不會替你開啟付費或購買額外配額。
-
-#### 模板來源
-
-可選模板：[Job Tracker: The Ultimate Job Search Companion](https://www.notion.com/templates/job-tracker-the-ultimate-job-search-companion)，作者 **Niko**。請從作者的原始頁面取得模板，再在自己的工作區使用。也可以完全不使用模板，自己建立符合五個欄位的空白資料庫。
-
-**本儲存庫只提供獨立匯入工具與必要欄位設定，不附帶第三方模板的頁面、版型、圖片、文案、匯出檔或可供重新散布的副本；亦未獲作者或 Notion 背書。**
-
-授權查核日期：2026-10-03。查閱公開模板頁面及其連結的作者商店後，未找到明確授權將此模板重新打包、公開散布或以開源授權發布的聲明。免費取得不代表獲得這些權利；若另有作者提供的授權文件，應再依該文件確認。
-
-[Notion Marketplace 條款](https://www.notion.com/help/template-gallery-guidelines-and-terms)保留創作者對模板內容的所有權，並授予終端使用者存取及使用權。條款另明文禁止重貼向其他創作者購買的內容；該句針對購買內容，不能單憑它斷言所有免費模板都被同樣禁止，也不能反過來推定免費模板可任意再散布。
-
-本專案的做法是公開獨立程式與原始模板連結，讓使用者各自向作者取得模板。如果要把模板本身或改版副本放上 GitHub，應先取得作者明確的再散布許可。作者聯絡入口在模板頁面的 **Email the creator**。這是依公開資料作的實務判斷，並非作者的授權確認。
-
-#### 隱私與開發
-
-儲存庫不包含帳號、Notion ID、密鑰、真實信件、求職資料或私人截圖。`.gitignore` 預設拒絕新檔案，只允許審查過的程式及說明；已追蹤檔案仍需檢查差異。
-
-網頁版修改 `Code.gs`、`Index.html`；CLI 修改 `cli.mjs`、`lib/`，共用解析規則在 `Code.gs`。修改共用或網頁程式後，重新產生整合版並測試：
+網頁原始碼：`Code.gs`、`Index.html`；終端機原始碼：`cli.mjs`、`lib/`。兩者共用 `Code.gs` 的解析規則。修改共用／網頁程式後，重新產生整合版 `SingleFile.gs`：
 
 ```sh
 python3 scripts/build-single.py
@@ -404,13 +368,8 @@ git config core.hooksPath scripts
 python3 scripts/check-private.py
 ```
 
-提交／推送檢查會掃描已追蹤內容與歷史，不會掃描電腦帳號資料夾。自動掃描不是完整隱私保證，提交前仍須審查內容。`SingleFile.gs` 是產生的完整程式；部署者只需使用該檔。
+隱私檢查只允許已審查的檔案，掃描追蹤內容與歷史，不掃描電腦帳號資料夾。自動檢查不是完整隱私保證，提交前仍須檢查差異。
 
-#### 官方文件
-
-- [Google 網頁部署](https://developers.google.com/apps-script/guides/web)
-- [Google 資訊清單設定](https://developers.google.com/apps-script/guides/manifest)
-- [Gmail API 服務](https://developers.google.com/apps-script/advanced/gmail)
-- [Notion 授權](https://developers.notion.com/guides/get-started/authorization)
+參考：[Apps Script 部署](https://developers.google.com/apps-script/guides/web)、[權限設定](https://developers.google.com/apps-script/guides/manifest)、[Gmail 服務](https://developers.google.com/apps-script/advanced/gmail)、[Notion 授權](https://developers.notion.com/guides/get-started/authorization)。
 
 </details>
