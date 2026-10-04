@@ -10,13 +10,13 @@ ALLOWED = {'SingleFile.gs', 'scripts/build-single.py', 'Code.gs', 'Index.html', 
 PATTERNS = {
     'API credential': r'\b(?:sk-(?:proj-|svcacct-)?[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|ntn_[A-Za-z0-9]{20,}|secret_[A-Za-z0-9]{20,}|AIza[A-Za-z0-9_-]{25,}|AKIA[A-Z0-9]{16})',
     'private key': r'-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----',
-    'OAuth credential': r'\b(?:ya29\.[A-Za-z0-9_-]{15,}|1//[A-Za-z0-9_-]{20,})',
+    'OAuth credential': r'\b(?:GOCSPX-[A-Za-z0-9_-]{15,}|ya29\.[A-Za-z0-9_-]{15,}|1//[A-Za-z0-9_-]{20,})',
     'JWT': r'\beyJ[A-Za-z0-9_-]{15,}\.[A-Za-z0-9_-]{15,}\.[A-Za-z0-9_-]{15,}',
     'personal email': r'[A-Za-z0-9._%+-]+@(?:gmail|outlook|hotmail|icloud|yahoo)\.com',
     'private identifier': r'\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b|\b[0-9a-f]{32}\b',
     'private link': r'https?://(?:app\.)?notion\.(?:so|com)/(?:p/)?[^\s)\"]*[0-9a-f]{32}|https?://mail\.google\.com/[^\s)\"]+|https?://script\.google\.com/macros/s/[^\s)\"]+',
     'personal filesystem path': r'/(?:Users|home)/[A-Za-z0-9_.-]+/',
-    'secret assignment': r'''(?i)(?:api_key|access_token|refresh_token|client_secret|password|NOTION_TOKEN)\s*[=:]\s*["'][^"'\s]{8,}["']''',
+    'secret assignment': r'''(?i)(?:api_key|access_token|refresh_token|client_secret|password|NOTION_TOKEN|notionSecret)["\']?\s*[=:]\s*["'][^"'\s]{8,}["']''',
 }
 
 def git(*args):
