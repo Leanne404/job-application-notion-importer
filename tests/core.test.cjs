@@ -34,7 +34,7 @@ assert.equal(ui.dateRange().endSeconds-ui.dateRange().startSeconds,23*3600);
 fields.startDate.value=fields.endDate.value='2020-11-01';
 assert.equal(ui.dateRange().endSeconds-ui.dateRange().startSeconds,25*3600);
 fields.startDate.value='2020-11-02';assert.throws(()=>ui.dateRange());
-fields.startDate.value='';fields.endDate.value='';assert.equal(ui.dateRange().startSeconds,null);
+fields.startDate.value='';fields.endDate.value='';const defaults=ui.dateRange();assert(Number.isFinite(defaults.startSeconds));assert(Number.isFinite(defaults.endSeconds));const now=new Date(),ago=new Date(now);ago.setDate(ago.getDate()-7);const fmt=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');assert.equal(fields.startDate.value,fmt(ago));assert.equal(fields.endDate.value,fmt(now));
 // Verify the actual Gmail call gets the range and exposes truncation.
 let captured;ctx.checkSchema_=()=>{};ctx.existing_=()=>[];
 ctx.Gmail={Users:{Messages:{list:(user,args)=>{captured=args;return {messages:[],nextPageToken:'synthetic-next'};}}}};

@@ -26,13 +26,18 @@ for(const r of data.results){const tr=document.createElement('tr');for(const key
 function dateRange(){
   const start=$('startDate'),end=$('endDate');
   if(!start.checkValidity()||!end.checkValidity()) throw Error('Enter valid dates.');
+  const today=new Date(),weekAgo=new Date(today);weekAgo.setDate(weekAgo.getDate()-7);
+  const localDate=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  if(!start.value)start.value=localDate(weekAgo);
+  if(!end.value)end.value=localDate(today);
   if(start.value && end.value && start.value>end.value) throw Error('Start date cannot be later than end date.');
   const midnight=value=>{const [y,m,d]=value.split('-').map(Number);const date=new Date(0);date.setFullYear(y,m-1,d);date.setHours(0,0,0,0);return date;};
   const from=start.value?midnight(start.value):null,to=end.value?midnight(end.value):null;
   if(to) to.setDate(to.getDate()+1);
   return {startSeconds:from?Math.floor(from.getTime()/1000):null,endSeconds:to?Math.floor(to.getTime()/1000):null};
 }
-$('dateHint').textContent='Search by received date, including both selected days. Leave a date blank for no bound. Time zone: '+Intl.DateTimeFormat().resolvedOptions().timeZone+'. Apply Date uses the application date stated in the email.';
+$('dateHint').textContent='Search by received date, including both selected days. Defaults to one week ago through today. Blank dates use those defaults. Time zone: '+Intl.DateTimeFormat().resolvedOptions().timeZone+'. Apply Date uses the application date stated in the email.';
+dateRange();
 function resetPreview(){tickets=[];$('rows').replaceChildren();$('table').hidden=true;$('empty').hidden=false;$('message').textContent='Search dates changed. Preview again.';busy(false);}
 for(const id of ['startDate','endDate']) $(id).onchange=resetPreview;
 const call=(name,...args)=>new Promise((resolve,reject)=>google.script.run.withSuccessHandler(resolve).withFailureHandler(reject)[name](...args));

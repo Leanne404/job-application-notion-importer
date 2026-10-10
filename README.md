@@ -10,7 +10,7 @@ Keep your **Notion job tracker** up to date in two ways: import LinkedIn applica
 
 **1. Import applications from Gmail — web app or terminal**
 
-- You do not need to enter each application in Notion. After setup, choose the **received-date range** to search; leave either date blank for no bound.
+- You do not need to enter each application in Notion. After setup, choose the **received-date range** to search; the web version pre-fills one week ago through today (both dates included). Clearing a date restores its default when you preview.
 - In the web app, click **Check and preview**, review the companies, positions, dates, and duplicate checks, then click **Import new applications**. The terminal provides the same preview/import workflow through commands shown below.
 - Each new row gets **Company, Position, Website, and Apply Date** from the confirmation email, with **Status = Applied**. Apply Date is the application date stated in the email, which may differ from its received date.
 - Matching existing jobs are skipped; uncertain duplicates and unsupported emails are flagged for manual review. Existing rows and their statuses are preserved.
@@ -179,7 +179,7 @@ node cli.mjs import --start 2026-10-01 --end 2026-10-03
 ### Dates and results — both methods
 
 - Dates filter **when the email arrived**, including both selected days in the browser/computer's timezone. **Apply Date** uses the application date inside the email.
-- Leave either web date blank, or omit `--start` / `--end`, for no bound. Omit both to search all supported confirmations.
+- Web dates default to one week ago through today; blank dates use those defaults. In the terminal, omitting `--start` / `--end` leaves that boundary open; omit both to search all supported confirmations.
 - **Ready to import:** can be added. **Already exists:** skipped. **Needs review:** check manually; it will not be imported.
 - This is a manual importer, not background sync. Do not run the web and terminal importers at the same time against the same database.
 
@@ -254,7 +254,7 @@ References: [Apps Script deployment](https://developers.google.com/apps-script/g
 
 **1. 從 Gmail 匯入申請紀錄（網頁版／終端機版）**
 
-- 不必先在 Notion 手動建立每筆申請。完成設定後，選擇要搜尋的**收信日期範圍**；開始或結束日期留空，代表該方向不設限制。
+- 不必先在 Notion 手動建立每筆申請。完成設定後，選擇要搜尋的**收信日期範圍**；網頁版進入時預填一週前至今天（包含起訖整天），清空日期後按預覽會恢復該欄預設值。
 - 網頁版按 **Check and preview**，檢查公司、職稱、日期及去重結果，再按 **Import new applications**。終端機版也有相同的預覽／匯入流程，指令見下方。
 - 新增的資料會從確認信填入 **Company、Position、Website、Apply Date**，並設定 **Status = Applied**。Apply Date 是信內的申請日期，可能與收信日期不同。
 - 已有相同職缺就跳過；疑似重複或不支援的信件會標示人工確認。既有資料及狀態會保留。
@@ -423,7 +423,7 @@ node cli.mjs import --start 2026-10-01 --end 2026-10-03
 ### 日期與結果（兩種方式相同）
 
 - 日期篩選的是**收到信的時間**，依瀏覽器／電腦時區，包含開始與結束整天。**Apply Date** 則採用信裡的應徵日期。
-- 網頁日期留空，或省略 `--start`／`--end`，表示不限該端；兩端都不設就查所有支援的歷史確認信。
+- 網頁版日期預設一週前至今天；留空會套用該欄預設值。終端機省略 `--start`／`--end` 才表示不限該端，兩端省略則查所有支援的歷史確認信。
 - **Ready to import**：可新增。**Already exists**：跳過。**Needs review**：要手動核對，不會匯入。
 - 這是手動匯入工具，沒有背景同步。不要同時用網頁與終端機對同一資料庫匯入。
 
