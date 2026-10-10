@@ -4,9 +4,9 @@ import re
 import subprocess
 import sys
 
-ALLOWED = {'SingleFile.gs', 'scripts/build-single.py', 'Code.gs', 'Index.html', 'appsscript.json', 'README.md', '.gitignore',
+ALLOWED = {'SingleFile.gs', 'scripts/build-single.py', 'Code.gs', 'Website.gs', 'Index.html', 'appsscript.json', 'README.md', '.gitignore',
            'scripts/check-private.py', 'scripts/pre-commit', 'scripts/pre-push',
-           'tests/core.test.cjs', 'cli.mjs', 'lib/local.mjs', 'lib/engine.mjs', 'lib/google.mjs', 'tests/cli.test.mjs'}
+           'tests/core.test.cjs', 'tests/website.test.cjs', 'cli.mjs', 'lib/local.mjs', 'lib/engine.mjs', 'lib/google.mjs', 'tests/cli.test.mjs'}
 PATTERNS = {
     'API credential': r'\b(?:sk-(?:proj-|svcacct-)?[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|ntn_[A-Za-z0-9]{20,}|secret_[A-Za-z0-9]{20,}|AIza[A-Za-z0-9_-]{25,}|AKIA[A-Z0-9]{16})',
     'private key': r'-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----',

@@ -4,6 +4,7 @@
 !/README.md
 !/SingleFile.gs
 !/Code.gs
+!/Website.gs
 !/Index.html
 !/appsscript.json
 !/cli.mjs
@@ -21,6 +22,7 @@
 !/tests/
 /tests/*
 !/tests/core.test.cjs
+!/tests/website.test.cjs
 !/tests/cli.test.mjs
 
 # Defense in depth for private files at any depth.

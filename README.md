@@ -4,7 +4,7 @@
 
 ## English
 
-Keep your **Notion job tracker** up to date in two ways: import LinkedIn application confirmation emails from Gmail, or fill existing rows from LinkedIn job links. Preview the results before confirming any changes. The interface and prompts are English; Gmail import supports English and Traditional Chinese confirmations.
+Keep your **Notion job tracker** up to date in two ways: import LinkedIn application confirmation emails from Gmail, or fill existing rows from external job websites. Preview the results before confirming any changes. The interface and prompts are English; Gmail import supports English and Traditional Chinese confirmations.
 
 ### What it does and how to use it
 
@@ -17,10 +17,10 @@ Keep your **Notion job tracker** up to date in two ways: import LinkedIn applica
 
 **2. Fill rows from job links — web app only**
 
-- In your Notion table, create a row and paste a **LinkedIn job URL into Website**. You can leave Company, Position, Status, and Apply Date blank. Repeat for other jobs.
-- Open **Fill existing rows** in the tool. Optionally choose **Apply Date** for this batch; leaving it blank uses your local date when you click **Fill blank fields**.
-- Click **Preview missing details**, review the results, then **Fill blank fields**. The tool reads the public job page to fill blank Company and Position, sets blank Status to `Applied`, and fills blank Apply Date. **This workflow does not look for Gmail confirmations.**
-- It checks the whole database for repeated LinkedIn job IDs before preview and again before writing. Duplicate rows are flagged and skipped, never deleted. Existing values are preserved. Pages that require login, block access, or lack readable job details need manual review.
+- In your Notion table, create a row and paste a **external job URL into Website**. You can leave Company, Position, Status, and Apply Date blank. Repeat for other jobs.
+- Open **Fill from Website** in the tool. Optionally choose **Apply Date** for this batch; leaving it blank uses your local date when you click **Fill blank fields**.
+- Click **Preview websites**, review the results, then **Fill blank fields**. The tool reads the external job page to fill blank Company and Position, sets blank Status to `Applied`, and fills blank Apply Date. **This workflow does not look for Gmail confirmations.**
+- It checks the whole database for duplicate job URLs before preview and again before writing. Duplicate rows are flagged and skipped, never deleted. Existing values are preserved. Pages that require login, block access, or lack readable job details need manual review.
 
 Both workflows use the five Notion properties listed below. **Location and other properties are not filled or changed.** The tool records applications you have made; it does not apply to jobs for you. Installation, permissions, and the buttons or commands for each method are explained below.
 
@@ -46,7 +46,7 @@ Use your existing tracker or create a Notion database with these **exact names a
 | Company | Title | Company name |
 | Position | Text | Job title |
 | Status | Select, with an `Applied` option | Initial application status |
-| Website | Text | Clickable LinkedIn job link |
+| Website | Text | Gmail import: LinkedIn job link. Website fill: the external job link you paste |
 | Apply Date | Date | Gmail import: date stated in the email. Link fill: chosen date, or the day you confirm |
 
 `Status` must be **Select**, not Notion's Status type. Both Position and Website use **Text**. All five properties must exist, even if you leave row values blank for link fill. Extra properties may remain in your table. The tool does not change your database structure.
@@ -85,21 +85,29 @@ If Google shows an unverified-app notice, confirm it is your own project and the
 
 1. On the tool page, expand **Set up or change Notion connection**.
 2. Paste your **Notion connection secret** and **Database link**, then click **Connect Notion**. If asked, select your table and click Connect again.
-3. Select **Start date / End date** → **Check and preview**.
+3. Click **LinkedIn Gmail import**, then select **Start date / End date** → **Check and preview**.
 4. Review the results → **Import new applications**. Keep the page open until it finishes.
 
 **Next time:** open the same bookmark. You do not need to redeploy or open Codex. Import soon after previewing; web previews expire after about 30 minutes and may be cleared earlier.
 
-### Fill existing Website-only rows — web app
+### Fill from external websites — web app
 
-Already pasted LinkedIn job links into **Website**? Use the separate **Fill existing rows** panel:
+The two workflow buttons are **LinkedIn Gmail import** and **Fill from Website**. They have separate previews and actions. To use the Website workflow:
 
-1. Enable **Update content** for your Notion connection, in addition to Read and Insert content.
-2. Optionally choose **Apply Date** (blank means your local date when you click **Fill blank fields**). Click **Preview missing details**, then **Fill blank fields** within 30 minutes.
+1. In Notion, put an **external job URL in Website**, one job per row. Leave the fields you want filled blank.
+2. Enable **Update content** for the Notion connection, then open **Fill from Website** in the tool.
+3. Optionally choose **Apply Date** for this batch. Leave it blank to use your local date when you confirm.
+4. Click **Preview websites**, check the extracted company, position, date and duplicate results, then **Fill blank fields** within 30 minutes.
 
-The tool reads the public LinkedIn job page from Website, without Gmail, and fills blank **Company, Position, Apply Date, and Status (`Applied`)**. It updates existing rows; filled values, Website, Location, icons, and other content are preserved. Duplicate LinkedIn job IDs are checked across the database before preview and again before updates. One row is kept as the update target (prefer more filled fields, then the oldest row); other copies are skipped and flagged, never deleted. Tracking parameters and job-title URLs are normalized by job ID. Login restrictions, unavailable pages, conflicting details, or pages without readable job data require manual review. Apply Date is your chosen date or the confirmation-day date, never the job posting date. Only LinkedIn job links are supported. This feature is available in the web app only.
+It fills blank **Company, Position, Apply Date, and Status (`Applied`)**. Your supplied **Website link stays intact**, as do existing values, Location, icons and other content. Rows without Website or with all target fields filled are skipped. This workflow does not read Gmail or create new Notion rows.
 
-To update an existing deployment, replace Apps Script `Code.gs` with the latest `SingleFile.gs`, then **Deploy → Manage deployments → Edit → New version → Deploy** and refresh your existing URL. Your saved Notion settings remain available.
+**Supported pages:** public company career pages that include readable `JobPosting` structured data, plus Greenhouse job-board links. It follows public HTTPS redirects after checking each destination. It cannot read every website: login requirements, access blocks, JavaScript-only pages, job lists or missing company/title data are flagged for manual review. No guessed company names or posting dates are written.
+
+**Duplicate checks:** compare normalized URLs (ignore common tracking parameters), known job-board IDs and resolved redirect URLs before preview and again before updates. For identical links, prefer the row with more filled fields, then the oldest row. Other copies are skipped, never deleted. A different link with the same company and position is flagged as a possible duplicate. Different URLs cannot always be identified as the same job automatically.
+
+**Validation:** live read-only checks extracted company and position from a Figma Greenhouse posting and a Stripe company-career page. A Spotify Lever page returned 403 and was correctly reported as unreadable. These are examples, not guarantees for every posting; your deployed Apps Script and Notion account still need your own preview check.
+
+To update an existing deployment, replace Apps Script `Code.gs` with the latest `SingleFile.gs`, then **Deploy → Manage deployments → Edit → New version → Deploy** and refresh your existing URL. Saved Notion settings remain available.
 
 ### Method 2: terminal
 
@@ -163,6 +171,9 @@ node cli.mjs import --start 2026-10-01 --end 2026-10-03
 
 ### Privacy and template
 
+Website reading sends the job URL only to its website (or the public Greenhouse API); public hostname checks use Google DNS. Gmail/Notion credentials are never sent with those requests. Website content is parsed as data, not executed.
+
+
 
 **Security checks (2026-10-04):** Gmail access is read-only; the deployment manifest defaults to Only myself. The web app sends API requests to Notion and rejects redirects. Email text is displayed as text, not executable HTML. Local Google login uses PKCE and a state check; local API requests restrict destinations and reject redirects. These are code-level protections, not verification of your deployed copy. Project editors can access Apps Script secrets; local credential files are not encrypted. Sender filtering is not a cryptographic proof that an email is authentic. Keep your project private and grant the Notion connection access only to the intended database.
 
@@ -206,6 +217,7 @@ Web source: `Code.gs`, `Index.html`. Terminal source: `cli.mjs`, `lib/`. Both re
 ```sh
 python3 scripts/build-single.py
 node tests/core.test.cjs
+node tests/website.test.cjs
 node --test tests/cli.test.mjs
 git config core.hooksPath scripts
 python3 scripts/check-private.py
@@ -221,7 +233,7 @@ References: [Apps Script deployment](https://developers.google.com/apps-script/g
 
 ## 繁體中文
 
-這個工具用兩種方式整理你的 **Notion 求職紀錄**：從 Gmail 匯入 LinkedIn 申請確認信，或依 LinkedIn 職缺連結補齊已有資料。所有變更都先預覽，再由你確認。介面與操作提示皆為英文；Gmail 匯入支援英文與繁體中文確認信。
+這個工具用兩種方式整理你的 **Notion 求職紀錄**：從 Gmail 匯入 LinkedIn 申請確認信，或依外部職缺網站連結補齊已有資料。所有變更都先預覽，再由你確認。介面與操作提示皆為英文；Gmail 匯入支援英文與繁體中文確認信。
 
 ### 有哪些功能、怎麼操作
 
@@ -234,10 +246,10 @@ References: [Apps Script deployment](https://developers.google.com/apps-script/g
 
 **2. 用職缺連結補齊資料（僅網頁版）**
 
-- 在 Notion 表格新增一列，把 **LinkedIn 職缺網址貼到 Website**；Company、Position、Status、Apply Date 可以留空。多個職缺就各放一列。
-- 打開工具的 **Fill existing rows** 區塊，可指定這批資料的 **Apply Date**；留空就用按下 **Fill blank fields** 時的本地日期。
-- 按 **Preview missing details** 預覽，檢查後按 **Fill blank fields**。工具直接讀公開職缺網頁，補上空白的公司、職稱，空白 Status 設為 `Applied`，並補申請日期。**這個流程不會搜尋 Gmail 確認信。**
-- 預覽與寫入前都會檢查整個資料庫的 LinkedIn 職缺編號；重複列標示並跳過，不會刪除。已有欄位值會保留。網站需登入、阻擋存取或缺少可讀資料時，需要人工確認。
+- 在 Notion 表格新增一列，把 **外部職缺網址貼到 Website**；Company、Position、Status、Apply Date 可以留空。多個職缺就各放一列。
+- 打開工具的 **Fill from Website** 區塊，可指定這批資料的 **Apply Date**；留空就用按下 **Fill blank fields** 時的本地日期。
+- 按 **Preview websites** 預覽，檢查後按 **Fill blank fields**。工具直接讀公開職缺網頁，補上空白的公司、職稱，空白 Status 設為 `Applied`，並補申請日期。**這個流程不會搜尋 Gmail 確認信。**
+- 預覽與寫入前都會檢查整個資料庫的重複職缺網址；重複列標示並跳過，不會刪除。已有欄位值會保留。網站需登入、阻擋存取或缺少可讀資料時，需要人工確認。
 
 兩個功能都使用下方列出的五個 Notion 欄位；**Location 與其他欄位不會填寫或修改**。工具用來記錄你已完成的申請，不會替你投遞職缺。安裝、權限及各方式的按鈕／指令說明都在下方。
 
@@ -263,7 +275,7 @@ References: [Apps Script deployment](https://developers.google.com/apps-script/g
 | Company | 標題 / Title | 公司名稱 |
 | Position | 文字 / Text | 職位名稱 |
 | Status | 選取 / Select，包含 `Applied` 選項 | 初始申請狀態 |
-| Website | 文字 / Text | 可點擊的 LinkedIn 職缺連結 |
+| Website | 文字 / Text | Gmail 匯入填 LinkedIn 連結；Website 補資料使用你貼的外部職缺連結 |
 | Apply Date | 日期 / Date | Gmail 匯入用信內申請日期；連結補資料用指定日期，留空則用按下確認當天 |
 
 `Status` 要用 **Select**，不是 Notion 的 Status 類型；Position、Website 都用 **Text**。五個欄位都必須存在，使用連結補資料時只是列內的值可以留空；表格可保留其他欄位。工具不會替你修改表格結構。
@@ -307,14 +319,22 @@ References: [Apps Script deployment](https://developers.google.com/apps-script/g
 
 **下次使用：** 開同一個書籤就好，不必重新部署，也不必開 Codex。預覽約 30 分鐘會過期，也可能提前被清除，預覽後就接著匯入。
 
-### 補齊只有 Website 連結的資料（網頁版）
+### 從外部職缺網站補資料（網頁版）
 
-已經把 LinkedIn 職缺連結貼到 **Website**？使用獨立的 **Fill existing rows** 區塊：
+介面有 **LinkedIn Gmail import** 和 **Fill from Website** 兩個功能按鈕，各自有預覽及操作。Website 功能的用法：
 
-1. 在 Notion 連線權限加開 **Update content（更新）**，原本的 Read、Insert 保留。
-2. 可自行選 **Apply Date**；留空就用按下 **Fill blank fields** 時的本地日期。按 **Preview missing details** 預覽，再於 30 分鐘內按 **Fill blank fields**。
+1. 在 Notion 的 **Website 貼外部職缺網址**，一個職缺一列；想讓工具補的欄位留空。
+2. 在 Notion 連線開啟 **Update content（更新）**，然後打開工具的 **Fill from Website**。
+3. 可指定這批資料的 **Apply Date**；留空就用按下確認時的本地日期。
+4. 按 **Preview websites**，檢查抓到的公司、職稱、日期和去重結果，再於 30 分鐘內按 **Fill blank fields**。
 
-工具會直接讀取 Website 中的 LinkedIn 公開職缺網頁，不依賴 Gmail，補上空白的 **Company、Position、Apply Date、Status（Applied）**。只更新原有資料；已有值、Website、Location、圖示和其他內容都保留。預覽及寫入前都會檢查整個資料庫的重複職缺編號，只補一筆（優先已有較多資料的列，再選最早建立的列）；其餘標示重複並跳過，不會刪除。追蹤參數與含職稱的網址會按職缺編號比對。需登入、網頁無法讀取、缺少可辨識資料或欄位衝突時，需人工確認。申請日期使用你指定的日期，留空則用按下確認當天，不使用職缺發布日期。目前只支援 LinkedIn 職缺連結。此功能只在網頁版提供。
+工具會補空白的 **Company、Position、Apply Date、Status（Applied）**。你貼的 **Website 原始連結會保留**；已有欄位值、Location、圖示和其他內容也保留。沒有 Website 或目標欄位都已填好的列會跳過。此流程不讀 Gmail，也不新增 Notion 列。
+
+**支援範圍：** 含可讀取 `JobPosting` 職缺資料的公司公開招募頁，以及 Greenhouse 職缺連結。網址轉址時會逐一檢查公開 HTTPS 目的地。無法保證所有網站都能讀取：需登入、阻擋存取、僅由 JavaScript 載入的頁面、職缺列表或缺少公司／職稱資料，都會標示人工確認，不猜公司名稱，也不把發布日期當申請日期。
+
+**去重方式：** 預覽及更新前，比對整理過的網址（忽略常見追蹤參數）、已支援招募平台的職缺編號及轉址後網址。同一連結優先補已有較多資料的列，再選最早建立的列；其他重複列跳過，不會刪除。不同網址但公司與職稱相同時，標示疑似重複。不同網址不一定能自動認出是同一職缺。
+
+**驗證範圍：** 已實際唯讀測試 Figma 的 Greenhouse 職缺與 Stripe 官網職缺，成功取得公司和職稱；Spotify 的 Lever 頁面回傳 403，工具正確標示無法讀取。這些案例不代表每個職缺都能讀；你部署的 Apps Script 與 Notion 帳號仍需先預覽確認。
 
 更新已部署的網頁：用最新 `SingleFile.gs` 取代 Apps Script 的 `Code.gs`，按 **部署 → 管理部署 → 編輯 → 新版本 → 部署**，再重新整理原網址。原 Notion 設定可沿用。
 
@@ -380,6 +400,9 @@ node cli.mjs import --start 2026-10-01 --end 2026-10-03
 
 ### 隱私與模板
 
+Website 讀取只向職缺網站（或 Greenhouse 公開 API）請求職缺資料；公開網域檢查使用 Google DNS。這些請求不會附帶 Gmail／Notion 憑證，網頁內容只作為資料解析，不執行其中程式。
+
+
 
 **資安檢查（2026-10-04）：** Gmail 只申請唯讀權限，部署設定預設僅限自己；網頁 API 請求送往 Notion 並拒絕轉址，信件文字不當成 HTML 執行。本機 Google 登入使用 PKCE 與 state 驗證，API 請求限制目的地並拒絕轉址。這是程式層的保護，未驗證你實際部署的副本；專案編輯者可取得 Apps Script 密鑰，本機憑證也未加密。寄件者篩選不等於驗證信件真偽。請保持專案私人，Notion 連線只授權需要的資料庫。
 
@@ -423,6 +446,7 @@ node cli.mjs import --start 2026-10-01 --end 2026-10-03
 ```sh
 python3 scripts/build-single.py
 node tests/core.test.cjs
+node tests/website.test.cjs
 node --test tests/cli.test.mjs
 git config core.hooksPath scripts
 python3 scripts/check-private.py
