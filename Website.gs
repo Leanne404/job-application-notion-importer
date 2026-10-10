@@ -247,8 +247,9 @@ function previewWebsiteRows(cursor,date) {
   CacheService.getUserCache().put('website:'+ticket,JSON.stringify({source,date:date||null,entries}),1800);
   return {ticket,results,nextCursor:offset+5<pages.length?String(offset+5):null};
 }
-function fillWebsiteRows(ticket,today) {
+function fillWebsiteRows(ticket,today,selectedDate) {
   websiteDate_(today);
+  if(selectedDate!==undefined&&selectedDate!==null)websiteDate_(selectedDate);
   const lock=LockService.getScriptLock();if(!lock.tryLock(1000))throw Error('Another operation is running. Try again shortly.');
   try {
     const cache=CacheService.getUserCache(),key='website:'+String(ticket),raw=cache.get(key);
@@ -270,7 +271,7 @@ function fillWebsiteRows(ticket,today) {
         if(Object.entries(entry.values).some(([field,value])=>norm_(details[field])!==norm_(value))){results.push(Object.assign({},display,{state:'review',reason:'Job details changed after preview. Preview again.'}));continue;}
         const duplicate=websiteDuplicate_(page,pages,details.keys,details);
         if(duplicate){results.push(Object.assign({},display,duplicate));continue;}
-        const proposal=websiteProposal_(display,details,preview.date||today,websiteFields_(page).filter(k=>entry.fields.includes(k)));
+        const proposal=websiteProposal_(display,details,selectedDate===undefined?(preview.date||today):(selectedDate||today),websiteFields_(page).filter(k=>entry.fields.includes(k)));
         if(proposal.state!=='ready'){results.push(proposal);continue;}
         const properties={},rt=value=>[{type:'text',text:{content:value}}];
         for(const field of proposal.fields)properties[field]=field==='Company'?{title:rt(proposal[field])}:['Position','Location','Salary Range'].includes(field)?{rich_text:rt(proposal[field])}:field==='Status'?{select:{name:'Applied'}}:{date:{start:proposal[field]}};
