@@ -74,6 +74,17 @@ If Google shows an unverified-app notice, confirm it is your own project and the
 
 **Next time:** open the same bookmark. You do not need to redeploy or open Codex. Import soon after previewing; web previews expire after about 30 minutes and may be cleared earlier.
 
+### Fill existing Website-only rows — web app
+
+Already pasted LinkedIn job links into **Website**? Use the separate **Fill existing rows** panel:
+
+1. Enable **Update content** for your Notion connection, in addition to Read and Insert content.
+2. Click **Preview missing details**, then **Fill blank fields** within 30 minutes.
+
+The tool matches each Website job ID to an English or Traditional Chinese Gmail application confirmation and fills blank **Company, Position, Apply Date, and Status (`Applied`)**. It updates existing rows; filled values, Website, Location, icons, and other content are preserved. No matching email, conflicting details, or unsupported links require manual review. Apply Date comes from the confirmation, not the job posting date. This feature is available in the web app only.
+
+To update an existing deployment, replace Apps Script `Code.gs` with the latest `SingleFile.gs`, then **Deploy → Manage deployments → Edit → New version → Deploy** and refresh your existing URL. Your saved Notion settings remain available.
+
 ### Method 2: terminal
 
 **You are running the tool on your computer.** This requires a separate one-time Google login setup; it does not use your Apps Script deployment.
@@ -263,6 +274,17 @@ References: [Apps Script deployment](https://developers.google.com/apps-script/g
 4. 檢查結果 → **Import new applications**，保持頁面開啟直到完成。
 
 **下次使用：** 開同一個書籤就好，不必重新部署，也不必開 Codex。預覽約 30 分鐘會過期，也可能提前被清除，預覽後就接著匯入。
+
+### 補齊只有 Website 連結的資料（網頁版）
+
+已經把 LinkedIn 職缺連結貼到 **Website**？使用獨立的 **Fill existing rows** 區塊：
+
+1. 在 Notion 連線權限加開 **Update content（更新）**，原本的 Read、Insert 保留。
+2. 按 **Preview missing details** 預覽，再於 30 分鐘內按 **Fill blank fields**。
+
+工具會依 Website 職缺編號比對 Gmail 中英文／繁體中文申請確認信，補上空白的 **Company、Position、Apply Date、Status（Applied）**。只更新原有資料；已有值、Website、Location、圖示和其他內容都保留。找不到信、資料衝突或連結不支援時，需要人工確認。申請日期取自確認信，不是職缺發布日期。此功能只在網頁版提供。
+
+更新已部署的網頁：用最新 `SingleFile.gs` 取代 Apps Script 的 `Code.gs`，按 **部署 → 管理部署 → 編輯 → 新版本 → 部署**，再重新整理原網址。原 Notion 設定可沿用。
 
 ### 方法二：終端機版
 

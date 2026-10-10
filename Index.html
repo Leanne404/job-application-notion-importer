@@ -5,10 +5,11 @@
 <details class="panel" id="setup"><summary>Set up or change Notion connection</summary><p>Create a Notion connection, grant it access to your database, then enter the details below. See the README for setup instructions.</p><div class="toolbar"><label for="secret">Notion connection secret</label><input id="secret" type="password" autocomplete="off"><label for="databaseLink">Database link</label><input id="databaseLink" type="url" placeholder="Paste the original database link"><select id="source" aria-label="Data source" hidden></select><button id="save">Connect Notion</button></div><p id="setupStatus" role="status"></p></details>
 <div class="panel"><div class="toolbar" style="margin-bottom:16px"><label for="startDate">Start date</label><input type="date" id="startDate" min="1970-01-01" max="9998-12-31"><label for="endDate">End date</label><input type="date" id="endDate" min="1970-01-01" max="9998-12-31"></div><p class="muted" id="dateHint"></p><div class="toolbar"><button id="preview">Check and preview</button><button class="secondary" id="import" disabled>Import new applications</button></div><div id="message" role="status" aria-live="polite">Choose dates, preview the results, then import.</div><p class="muted">Only missing applications are added. Matching jobs are skipped; possible duplicates are flagged for review. Existing application statuses are preserved.</p></div>
 <div class="panel table"><div id="empty">Preview companies, positions, application dates, and duplicate checks here.</div><table id="table" hidden><thead><tr><th>Company</th><th>Position</th><th>Status</th><th>Website</th><th>Apply Date</th><th>Check result</th></tr></thead><tbody id="rows"></tbody></table></div>
+<section class="panel"><h2>Fill existing rows</h2><p>Find rows with a LinkedIn job link in Website and fill blank Company, Position, Apply Date, and Status fields using matching Gmail confirmation emails. Existing values are preserved. Missing or conflicting confirmations need manual review.</p><div class="toolbar"><button id="fillPreview">Preview missing details</button><button id="fillApply" class="secondary" disabled>Fill blank fields</button></div><p id="fillMessage" role="status" aria-live="polite">Preview first, then confirm the updates. Notion Update content permission is required.</p><div class="table"><p id="fillEmpty" class="muted">Rows needing details will appear here.</p><table id="fillTable" hidden><thead><tr><th>Company</th><th>Position</th><th>Status</th><th>Website</th><th>Apply Date</th><th>Check result</th></tr></thead><tbody id="fillRows"></tbody></table></div></section>
 <p class="muted">Supports English and Traditional Chinese LinkedIn application confirmations. Matching emails with unsupported layouts are flagged for manual review.</p></main>
 <script>
-let tickets=[], working=false;const $=id=>document.getElementById(id);const labels={new:'Ready to import',duplicate:'Already exists',review:'Needs review',created:'Created',error:'Incomplete'};
-function busy(v){working=v;for(const id of ['preview','startDate','endDate','save','secret','databaseLink','source']) $(id).disabled=v;$('import').disabled=v||!tickets.length;}
+let fillTickets=[], tickets=[], working=false;const $=id=>document.getElementById(id);const labels={new:'Ready to import',duplicate:'Already exists',review:'Needs review',created:'Created',error:'Incomplete',ready:'Ready to fill',complete:'Already complete',filled:'Updated'};
+function busy(v){working=v;for(const id of ['preview','startDate','endDate','save','secret','databaseLink','source','fillPreview']) $(id).disabled=v;$('import').disabled=v||!tickets.length;$('fillApply').disabled=v||!fillTickets.length;}
 function errorMessage(e){
   const message=String(e && e.message || e || '');
   return !message || /[^\x00-\x7F]/.test(message)
@@ -16,8 +17,8 @@ function errorMessage(e){
     : message;
 }
 function error(e){tickets=[];busy(false);$('message').textContent=errorMessage(e);}
-function render(data){$('rows').replaceChildren();$('table').hidden=!data.results.length;$('empty').hidden=!!data.results.length;
-for(const r of data.results){const tr=document.createElement('tr');for(const key of ['Company','Position','Status','Website','Apply Date']){const td=document.createElement('td');if(key==='Website'&&r[key]){const a=document.createElement('a');a.href=r[key];a.textContent='LinkedIn job';a.target='_blank';a.rel='noopener noreferrer';td.append(a);}else td.textContent=r[key]||'—';tr.append(td);}const td=document.createElement('td'),badge=document.createElement('span');badge.className='badge '+r.state;badge.textContent=labels[r.state]||r.state;td.append(badge);const note=document.createElement('div');note.className='muted';note.textContent=r.reason?errorMessage(r.reason):'';td.append(note);tr.append(td);$('rows').append(tr);}}
+function render(data,prefix){const id=name=>prefix?'fill'+name[0].toUpperCase()+name.slice(1):name;$(id('rows')).replaceChildren();$(id('table')).hidden=!data.results.length;$(id('empty')).hidden=!!data.results.length;
+for(const r of data.results){const tr=document.createElement('tr');for(const key of ['Company','Position','Status','Website','Apply Date']){const td=document.createElement('td');if(key==='Website'&&r[key]){const a=document.createElement('a');a.href=r[key];a.textContent='LinkedIn job';a.target='_blank';a.rel='noopener noreferrer';td.append(a);}else td.textContent=r[key]||'—';tr.append(td);}const td=document.createElement('td'),badge=document.createElement('span');badge.className='badge '+r.state;badge.textContent=labels[r.state]||r.state;td.append(badge);const note=document.createElement('div');note.className='muted';note.textContent=r.reason?errorMessage(r.reason):'';td.append(note);tr.append(td);$(id('rows')).append(tr);}}
 function dateRange(){
   const start=$('startDate'),end=$('endDate');
   if(!start.checkValidity()||!end.checkValidity()) throw Error('Enter valid dates.');
@@ -63,13 +64,38 @@ $('import').onclick=async()=>{
 for(const id of ['secret','databaseLink']) $(id).oninput=()=>{$('source').replaceChildren();$('source').hidden=true;};
 $('save').onclick=async()=>{
   if(working)return;
-  tickets=[];busy(true);$('setupStatus').textContent='Checking the Notion connection...';
+  tickets=[];fillTickets=[];busy(true);$('setupStatus').textContent='Checking the Notion connection...';
   try {
     const data=await call('saveConnection',$('secret').value,$('databaseLink').value,$('source').value||null);
     if(data.sources){$('source').replaceChildren();for(const item of data.sources){const option=document.createElement('option');option.value=item.id;option.textContent=item.name;$('source').append(option);}$('source').hidden=false;$('setupStatus').textContent='Select a data source, then click Connect Notion.';}
-    else {$('secret').value='';$('databaseLink').value='';$('setupStatus').textContent='Connected. Settings are saved in your private project.';$('setup').open=false;resetPreview();}
+    else {$('secret').value='';$('databaseLink').value='';$('setupStatus').textContent='Connected. Settings are saved in your private project.';$('setup').open=false;resetPreview();resetFill();}
   }catch(e){$('setupStatus').textContent=errorMessage(e);}
   finally{busy(false);}
+};
+
+function resetFill(){fillTickets=[];$('fillRows').replaceChildren();$('fillTable').hidden=true;$('fillEmpty').hidden=false;$('fillMessage').textContent='Preview first, then confirm the updates.';}
+function fillError(e){fillTickets=[];busy(false);$('fillMessage').textContent=errorMessage(e);}
+$('fillPreview').onclick=async()=>{
+  if(working)return;
+  fillTickets=[];busy(true);const results=[],seen=new Set();let cursor=null;
+  try{do{
+    $('fillMessage').textContent='Checking existing rows... Keep this page open.';
+    const data=await call('previewExistingRows',cursor);results.push(...data.results);render({results},'fill');
+    if(data.results.some(r=>r.state==='ready'))fillTickets.push(data.ticket);
+    cursor=data.nextCursor;if(cursor&&seen.has(cursor))throw Error('Repeated pagination response. Preview again.');if(cursor)seen.add(cursor);
+  }while(cursor);
+  busy(false);$('fillMessage').textContent=results.filter(r=>r.state==='ready').length+' rows ready to update. Confirm within 30 minutes. Rows needing review will be skipped.';
+  }catch(e){fillError(e);}
+};
+$('fillApply').onclick=async()=>{
+  if(working||!fillTickets.length)return;
+  const queue=fillTickets.slice();fillTickets=[];busy(true);const results=[];
+  try{for(const ticket of queue){
+    $('fillMessage').textContent='Filling blank fields... Keep this page open.';
+    const data=await call('fillExistingRows',ticket);results.push(...data.results);render({results},'fill');
+    if(data.results.some(r=>r.state==='error'))throw Error('Updates stopped. Review the results and preview again to check completed rows.');
+  }busy(false);$('fillMessage').textContent='Done: '+results.filter(r=>r.state==='filled').length+' existing rows updated.';
+  }catch(e){fillError(e);}
 };
 call('connectionStatus').then(data=>{$('setup').open=!data.ready;$('setupStatus').textContent=data.ready?'Notion connection configured.':'Notion is not connected. Complete setup first.';}).catch(error);
 </script></body></html>
