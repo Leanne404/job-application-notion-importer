@@ -19,10 +19,10 @@ Keep your **Notion job tracker** up to date in two ways: import LinkedIn applica
 
 - In your Notion table, create a row and paste a **external job URL into Website**. You can leave Company, Position, Status, and Apply Date blank. Repeat for other jobs.
 - Open **Fill from Website** in the tool. Optionally choose **Apply Date** for this batch; leaving it blank uses your local date when you click **Fill blank fields**.
-- Click **Preview websites**, review the results, then **Fill blank fields**. The tool reads the external job page to fill blank Company and Position, sets blank Status to `Applied`, and fills blank Apply Date. **This workflow does not look for Gmail confirmations.**
+- Click **Preview websites**, review the results, then **Fill blank fields**. The tool reads the external job page to fill available blank Company, Position, Location and Salary Range, sets blank Status to `Applied`, and fills blank Apply Date. **This workflow does not look for Gmail confirmations.**
 - It checks the whole database for duplicate job URLs before preview and again before writing. Duplicate rows are flagged and skipped, never deleted. Existing values are preserved. Pages that require login, block access, or lack readable job details need manual review.
 
-Both workflows use the five Notion properties listed below. **Location and other properties are not filled or changed.** The tool records applications you have made; it does not apply to jobs for you. Installation, permissions, and the buttons or commands for each method are explained below.
+Both workflows use the five Notion properties listed below. Gmail import uses those five properties only. Website fill can also populate blank **Location** and **Salary Range** when those optional **Text** properties exist. Other properties are preserved. The tool records applications you have made; it does not apply to jobs for you. Installation, permissions, and the buttons or commands for each method are explained below.
 
 ### Choose how to run it
 
@@ -99,9 +99,9 @@ The two workflow buttons are **LinkedIn Gmail import** and **Fill from Website**
 3. Optionally choose **Apply Date** for this batch. Leave it blank to use your local date when you confirm.
 4. Click **Preview websites**, check the extracted company, position, date and duplicate results, then **Fill blank fields** within 30 minutes.
 
-It fills blank **Company, Position, Apply Date, and Status (`Applied`)**. Your supplied **Website link stays intact**, as do existing values, Location, icons and other content. Rows without Website or with all target fields filled are skipped. This workflow does not read Gmail or create new Notion rows.
+It fills whatever it can find: blank **Company, Position, Location, Salary Range**, plus **Apply Date and Status (`Applied`)**. Missing details stay blank; they do not prevent other available fields from being filled. Your supplied **Website link stays intact**, as do existing values, icons and other content. Rows without Website or with all supported target fields filled are skipped. **Location** and **Salary Range** are optional **Text** properties; absent or differently typed properties are not changed. Salary text retains the published currency, range and pay period when provided; no salary or annual conversion is guessed. This workflow does not read Gmail or create new Notion rows.
 
-**Supported pages:** public company career pages that include readable `JobPosting` structured data, plus Greenhouse job-board links. It follows public HTTPS redirects after checking each destination. It cannot read every website: login requirements, access blocks, JavaScript-only pages, job lists or missing company/title data are flagged for manual review. No guessed company names or posting dates are written.
+**Supported pages:** public company career pages that include readable `JobPosting` structured data, plus Greenhouse job-board links. It follows public HTTPS redirects after checking each destination. It cannot read every website: login requirements, access blocks, JavaScript-only pages, job lists or pages without a readable job posting are flagged for manual review. Partial job postings can still fill the fields they provide. No guessed company names or posting dates are written.
 
 **Duplicate checks:** compare normalized URLs (ignore common tracking parameters), known job-board IDs and resolved redirect URLs before preview and again before updates. For identical links, prefer the row with more filled fields, then the oldest row. Other copies are skipped, never deleted. A different link with the same company and position is flagged as a possible duplicate. Different URLs cannot always be identified as the same job automatically.
 
@@ -248,10 +248,10 @@ References: [Apps Script deployment](https://developers.google.com/apps-script/g
 
 - 在 Notion 表格新增一列，把 **外部職缺網址貼到 Website**；Company、Position、Status、Apply Date 可以留空。多個職缺就各放一列。
 - 打開工具的 **Fill from Website** 區塊，可指定這批資料的 **Apply Date**；留空就用按下 **Fill blank fields** 時的本地日期。
-- 按 **Preview websites** 預覽，檢查後按 **Fill blank fields**。工具直接讀公開職缺網頁，補上空白的公司、職稱，空白 Status 設為 `Applied`，並補申請日期。**這個流程不會搜尋 Gmail 確認信。**
+- 按 **Preview websites** 預覽，檢查後按 **Fill blank fields**。工具直接讀公開職缺網頁，盡量補上空白的公司、職稱、地點及薪資範圍，空白 Status 設為 `Applied`，並補申請日期。**這個流程不會搜尋 Gmail 確認信。**
 - 預覽與寫入前都會檢查整個資料庫的重複職缺網址；重複列標示並跳過，不會刪除。已有欄位值會保留。網站需登入、阻擋存取或缺少可讀資料時，需要人工確認。
 
-兩個功能都使用下方列出的五個 Notion 欄位；**Location 與其他欄位不會填寫或修改**。工具用來記錄你已完成的申請，不會替你投遞職缺。安裝、權限及各方式的按鈕／指令說明都在下方。
+兩個功能都使用下方列出的五個 Notion 欄位；Gmail 匯入只使用這五個欄位；Website 補資料還能填空白的 **Location、Salary Range**，只要表格有這兩個選用的**文字 / Text** 欄位。其他欄位保留。工具用來記錄你已完成的申請，不會替你投遞職缺。安裝、權限及各方式的按鈕／指令說明都在下方。
 
 ### 選一種執行方式
 
@@ -328,9 +328,9 @@ References: [Apps Script deployment](https://developers.google.com/apps-script/g
 3. 可指定這批資料的 **Apply Date**；留空就用按下確認時的本地日期。
 4. 按 **Preview websites**，檢查抓到的公司、職稱、日期和去重結果，再於 30 分鐘內按 **Fill blank fields**。
 
-工具會補空白的 **Company、Position、Apply Date、Status（Applied）**。你貼的 **Website 原始連結會保留**；已有欄位值、Location、圖示和其他內容也保留。沒有 Website 或目標欄位都已填好的列會跳過。此流程不讀 Gmail，也不新增 Notion 列。
+工具會盡量補抓得到的空白 **Company、Position、Location、Salary Range**，以及 **Apply Date、Status（Applied）**。缺少的資料留空，不會擋住其他抓到的欄位。你貼的 **Website 原始連結會保留**；已有欄位值、圖示和其他內容也保留。沒有 Website 或支援的目標欄位都已填好的列會跳過。**Location、Salary Range** 是選用的**文字 / Text** 欄位；不存在或類型不同時不修改。薪資保留網站提供的幣別、範圍及計薪週期，不猜金額，也不擅自換算年薪。此流程不讀 Gmail，也不新增 Notion 列。
 
-**支援範圍：** 含可讀取 `JobPosting` 職缺資料的公司公開招募頁，以及 Greenhouse 職缺連結。網址轉址時會逐一檢查公開 HTTPS 目的地。無法保證所有網站都能讀取：需登入、阻擋存取、僅由 JavaScript 載入的頁面、職缺列表或缺少公司／職稱資料，都會標示人工確認，不猜公司名稱，也不把發布日期當申請日期。
+**支援範圍：** 含可讀取 `JobPosting` 職缺資料的公司公開招募頁，以及 Greenhouse 職缺連結。網址轉址時會逐一檢查公開 HTTPS 目的地。無法保證所有網站都能讀取：需登入、阻擋存取、僅由 JavaScript 載入的頁面、職缺列表或完全沒有可讀職缺資料，都會標示人工確認；職缺只提供部分資料時，仍可補抓得到的欄位，不猜公司名稱，也不把發布日期當申請日期。
 
 **去重方式：** 預覽及更新前，比對整理過的網址（忽略常見追蹤參數）、已支援招募平台的職缺編號及轉址後網址。同一連結優先補已有較多資料的列，再選最早建立的列；其他重複列跳過，不會刪除。不同網址但公司與職稱相同時，標示疑似重複。不同網址不一定能自動認出是同一職缺。
 
