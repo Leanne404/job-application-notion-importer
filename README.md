@@ -215,7 +215,7 @@ You may create your own database or obtain [Niko's Job Tracker template](https:/
 
 **Local file errors:** after a crash, confirm the old process has stopped before removing a stale `.local/run.lock`. Preserve and inspect any `*.json.tmp` and its corresponding JSON before removing temporary files. Locks and pending records are separate across local copies and Apps Script.
 
-**Supported messages:** English “Your application was sent to” / “Your application has been sent to” and Traditional Chinese application confirmations. Simplified Chinese, HTML-only messages, and other layouts may not parse. Ambiguous dates are flagged for review. Duplicate checks prioritize LinkedIn job ID, then company, position, and date. English parsing and CLI workflows use synthetic tests; real desktop OAuth/account access still needs your own setup.
+**Supported messages:** English “Your application was sent to” / “Your application has been sent to” and Traditional Chinese application confirmations. Simplified Chinese, HTML-only messages, and other layouts may not parse. Ambiguous dates are flagged for review. Duplicate checks recognize LinkedIn job IDs in numeric links, title-slug links and `currentJobId` search links, including links behind Notion text. The same ID is skipped regardless of existing descriptive fields. The same company and position with a different ID is marked **Needs review**, not automatically imported; it may be a repost or a separate opening. Without matching IDs, company, position and date are also checked. English parsing and CLI workflows use synthetic tests; real desktop OAuth/account access still needs your own setup.
 
 **Service limits:** the CLI paces requests and retries temporary rate limits a bounded number of times. Persistent errors stop processing. There is no automatic background resume or CLI preview expiry. Actual quotas and pricing depend on your providers; the tool does not enable billing or purchase extra quota.
 
@@ -456,7 +456,7 @@ Website 讀取只向職缺網站（或 Greenhouse 公開 API）請求職缺資�
 
 **本機檔案錯誤：** 當機後先確認舊程序已停止，再刪除殘留 `.local/run.lock`。若有 `*.json.tmp`，先保留並檢查對應 JSON，再處理暫存檔。不同本機副本與 Apps Script 的鎖、pending 紀錄各自獨立。
 
-**信件支援：** 英文「Your application was sent to／Your application has been sent to」與繁體中文申請確認信。不支援簡體中文；純 HTML 或其他排版可能無法解析。含糊日期會列為待確認。去重優先比 LinkedIn 職缺 ID，再比公司、職位、日期。英文解析與 CLI 流程以虛構資料測試，真實桌面 OAuth／帳號仍須完成自己的設定後驗證。
+**信件支援：** 英文「Your application was sent to／Your application has been sent to」與繁體中文申請確認信。不支援簡體中文；純 HTML 或其他排版可能無法解析。含糊日期會列為待確認。去重支援 LinkedIn 純數字網址、含職稱的網址、`currentJobId` 搜尋網址，以及 Notion 文字背後的超連結。同 ID 會直接跳過，即使既有描述欄位空白；同公司、同職稱但 ID 不同時，改列 **Needs review**，不自動新增，因為可能是重刊或另一個職缺。沒有相同 ID 時也會比對公司、職稱和日期。英文解析與 CLI 流程以虛構資料測試，真實桌面 OAuth／帳號仍須完成自己的設定後驗證。
 
 **服務限制：** CLI 控制請求速度，遇暫時限流會有限次重試，持續失敗會停止。沒有背景自動續跑；CLI 沒有預覽到期期限。實際配額與計價依服務商規定，工具不會替你開付費或購買配額。
 

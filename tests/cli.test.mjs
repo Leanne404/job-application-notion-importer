@@ -16,13 +16,13 @@ function memory() {
   const values = new Map();
   return { read: (name, fallback) => structuredClone(values.get(name) ?? fallback), write: (name, value) => values.set(name, structuredClone(value)) };
 }
-function email(id, job = '123', chinese = false, date = '2020-01-02') {
+function email(id, job = '123', chinese = false, date = '2020-01-02', position = 'Software Engineer') {
   const subject = chinese ? '您的應徵資料已傳送到Example Company' : 'Your application was sent to Example Company';
-  const body = `${subject}\nSoftware Engineer\nExample Company\nhttps://www.linkedin.com/jobs/view/${job}/\n${chinese ? '應徵日期：2020年1月2日' : `Date applied: ${date}`}`;
+  const body = `${subject}\n${position}\nExample Company\nhttps://www.linkedin.com/jobs/view/${job}/\n${chinese ? '應徵日期：2020年1月2日' : `Date applied: ${date}`}`;
   return { id, internalDate: String(new Date(2020, 0, 2, 12).getTime()), payload: { headers: [{ name: 'From', value: 'jobs-noreply@linkedin.com' }, { name: 'Subject', value: subject }], mimeType: 'text/plain', body: { data: Buffer.from(body).toString('base64url') } } };
 }
 function fixture({ failCreate = false, repeated = false, icon = null } = {}) {
-  const store = memory(), pages = [], created = [], messages = { one: email('one'), two: email('two', '123', true), three: email('three', '456') };
+  const store = memory(), pages = [], created = [], messages = { one: email('one'), two: email('two', '123', true), three: email('three', '456', false, '2020-01-02', 'Data Engineer') };
   const gmail = async route => {
     if (route.startsWith('messages/')) return messages[route.split('/')[1].split('?')[0]];
     const query = new URLSearchParams(route.split('?')[1]);
@@ -207,4 +207,15 @@ test('created pages copy the default template icon and ignore extra icon fields'
   await engine.import(await engine.preview(range), range);
   assert.equal(created.length, 2);
   assert.ok(created.every(page => page.icon.emoji === '💼' && !('extra' in page.icon)));
+});
+
+test('same-title reposts require review, and alternate LinkedIn URLs prevent new writes', async () => {
+  const f=fixture(),range=dateRange();f.messages.three=email('three','456');
+  const preview=await f.engine.preview(range);assert.deepEqual(preview.map(r=>r.state),['new','duplicate','review']);
+  await f.engine.import(preview,range);assert.equal(f.created.length,1);
+  // The existing row's slug link must match, even if its descriptive fields are blank.
+  f.pages[0].properties.Company.title=[];f.pages[0].properties.Position.rich_text=[];
+  f.pages[0].properties.Website.rich_text=[{text:{content:'https://www.linkedin.com/jobs/view/software-engineer-at-example-123/'}}];
+  const next=await f.engine.preview(range);assert.equal(next[0].state,'duplicate');assert.equal(next[1].state,'duplicate');
+  await f.engine.import([preview[0]],range);assert.equal(f.created.length,1);
 });
