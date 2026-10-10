@@ -1,4 +1,4 @@
-# LinkedIn → Notion Application Tracker
+# Job Application Notion Importer
 
 [English](#english) · [繁體中文](#繁體中文)
 

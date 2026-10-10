@@ -7,7 +7,7 @@ function dataSource_() {
 }
 const MAIL_QUERY = 'from:jobs-noreply@linkedin.com {subject:"您的應徵資料已傳送到" subject:"Your application was sent to" subject:"Your application has been sent to"}';
 function doGet() {
-  return HtmlService.createHtmlOutputFromFile('Index').setTitle('LinkedIn Application Tracker');
+  return HtmlService.createHtmlOutputFromFile('Index').setTitle('Job Application Notion Importer');
 }
 function norm_(s) { return String(s || '').normalize('NFKC').toLowerCase().replace(/\s+/g,' ').trim(); }
 function ids_(s) { return [...String(s || '').matchAll(/https?:\/\/(?:[\w-]+\.)?linkedin\.com\/(?:comm\/)?jobs\/view\/(\d+)/gi)].map(m=>m[1]); }
