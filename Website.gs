@@ -193,9 +193,14 @@ function websiteProperty_(property) {
   if(!property)return '';
   if(property.type==='url')return property.url||'';
   const parts=property[property.type]||[];
-  const visible=parts.map(x=>x.plain_text||(x.text&&x.text.content)||'').join('');
-  const targets=parts.map(x=>x.href||(x.text&&x.text.link&&x.text.link.url)||'').filter(Boolean);
-  return [visible,...targets].filter(Boolean).join(' ');
+  const values=[];let plain='';
+  for(const part of parts){
+    const target=part.href||(part.text&&part.text.link&&part.text.link.url);
+    if(target){if(plain){values.push(plain);plain='';}values.push(target);}
+    else plain+=part.plain_text||(part.text&&part.text.content)||'';
+  }
+  if(plain)values.push(plain);
+  return [...new Set(values)].join(' ');
 }
 function websiteRow_(page) {
   const p=page.properties;
