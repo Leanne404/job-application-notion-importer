@@ -88,10 +88,45 @@ function websiteText_(value) {
     return n>0&&n<=0x10ffff?String.fromCodePoint(n):all;
   }).replace(/\s+/g,' ').trim();
 }
-function websiteDetails_(company,position,url) {
-  company=websiteText_(company);position=websiteText_(position);
-  if(!company||!position||company.length>2000||position.length>2000||/[<>\x00-\x1f]/.test(company+position))throw Error('The page does not provide a readable company and job title. Review it manually.');
-  return {Company:company,Position:position,Website:url,Status:'Applied'};
+function websiteValue_(value) {
+  const text=websiteText_(value);
+  return text&&text.length<=2000&&!/[<>\x00-\x1f]/.test(text)?text:'';
+}
+function websiteLocation_(job) {
+  const locations=[].concat(job.jobLocation||[]).map(place=>{
+    const address=place&&place.address;
+    if(typeof address==='string')return websiteValue_(address);
+    if(address){const country=typeof address.addressCountry==='object'?address.addressCountry.name:address.addressCountry;
+      return [...new Set([address.addressLocality,address.addressRegion,country].map(websiteValue_).filter(Boolean))].join(', ');}
+    return websiteValue_(place&&place.name);
+  }).filter(Boolean);
+  if(job.jobLocationType==='TELECOMMUTE'){
+    const regions=[].concat(job.applicantLocationRequirements||[]).map(x=>websiteValue_(x&&x.name)).filter(Boolean);
+    locations.unshift('Remote'+(regions.length?' ('+regions.join(', ')+')':''));
+  }
+  return websiteValue_([...new Set(locations)].join('; '));
+}
+function websiteSalary_(salary) {
+  const salaries=[].concat(salary||[]).map(item=>{
+    if(!item||typeof item!=='object')return '';
+    const value=item.value&&typeof item.value==='object'?item.value:{value:item.value};
+    const valid=n=>typeof n==='number'&&Number.isFinite(n)&&n>=0;
+    const format=n=>{const [whole,fraction]=String(n).split('.');return whole.replace(/\B(?=(\d{3})+(?!\d))/g,',')+(fraction?'.'+fraction:'');};
+    let amount='';
+    if(valid(value.value))amount=format(value.value);
+    else if(valid(value.minValue)&&valid(value.maxValue)&&value.minValue<=value.maxValue)amount=format(value.minValue)+'–'+format(value.maxValue);
+    else if(valid(value.minValue)&&value.maxValue==null)amount='from '+format(value.minValue);
+    else if(valid(value.maxValue)&&value.minValue==null)amount='up to '+format(value.maxValue);
+    if(!amount)return '';
+    const units={HOUR:'hour',DAY:'day',WEEK:'week',MONTH:'month',YEAR:'year'};
+    const currency=typeof item.currency==='string'&&/^[A-Z]{3}$/i.test(item.currency)?item.currency.toUpperCase():'Currency unspecified';
+    const unit=units[String(value.unitText||'').toUpperCase()];
+    return currency+' '+amount+(unit?' / '+unit:' (period unspecified)');
+  }).filter(Boolean);
+  return websiteValue_([...new Set(salaries)].join('; '));
+}
+function websiteDetails_(company,position,url,location,salary) {
+  return {Company:websiteValue_(company),Position:websiteValue_(position),Location:websiteValue_(location),'Salary Range':websiteValue_(salary),Website:url,Status:'Applied'};
 }
 function websiteParse_(html,url) {
   const jobs=[];
@@ -109,16 +144,17 @@ function websiteParse_(html,url) {
   const candidates=exact.length?exact:jobs;
   if(candidates.length!==1)throw Error('This page has no single readable job posting. Login-only, JavaScript-only, or job-list pages may need manual review.');
   const job=candidates[0];
-  return websiteDetails_(job.hiringOrganization&&job.hiringOrganization.name,job.title,url);
+  return websiteDetails_(job.hiringOrganization&&job.hiringOrganization.name,job.title,url,websiteLocation_(job),websiteSalary_(job.baseSalary));
 }
 function websiteRead_(value) {
   const u=websiteUrl_(value),match=u.path.match(/^\/([a-z\d_-]+)\/jobs\/(\d+)\/?$/i);
   // Greenhouse exposes published job details without an API key.
   if(/^(?:boards|job-boards)\.greenhouse\.io$/.test(u.host)&&match) {
-    const response=websiteFetch_('https://boards-api.greenhouse.io/v1/boards/'+match[1]+'/jobs/'+match[2]);
+    const response=websiteFetch_('https://boards-api.greenhouse.io/v1/boards/'+match[1]+'/jobs/'+match[2]+'?pay_transparency=true');
     const job=JSON.parse(response.body);
     if(String(job.id)!==match[2])throw Error('The job website returned a different job.');
-    const details=websiteDetails_(job.company_name,job.title,u.url);
+    const salaries=(job.pay_input_ranges||[]).map(p=>({currency:p.currency_type,value:{minValue:typeof p.min_cents==='number'?p.min_cents/100:undefined,maxValue:typeof p.max_cents==='number'?p.max_cents/100:undefined}}));
+    const details=websiteDetails_(job.company_name,job.title,u.url,job.location&&job.location.name,websiteSalary_(salaries));
     return Object.assign(details,{keys:[websiteKey_(u.url)]});
   }
   const response=websiteFetch_(u.url),details=websiteParse_(response.body,response.url);
@@ -130,9 +166,17 @@ function websiteDate_(value) {
   if(!Number.isFinite(date.getTime())||date.toISOString().slice(0,10)!==value)throw Error('Enter a valid application date.');
   return value;
 }
+function websiteOptional_(p) {
+  if(!p)return '';
+  if(p.type==='rich_text')return text_(p);
+  if(p.type==='number')return p.number==null?'':String(p.number);
+  if(p.type==='select')return p.select?p.select.name:'';
+  if(p.type==='multi_select')return (p.multi_select||[]).map(x=>x.name).join(', ');
+  return '[Not editable]';
+}
 function websiteRow_(page) {
   const p=page.properties;
-  return {pageId:page.id,Company:text_(p.Company),Position:text_(p.Position),Website:text_(p.Website,true),Status:p.Status.select?p.Status.select.name:'','Apply Date':p['Apply Date'].date?p['Apply Date'].date.start.slice(0,10):''};
+  return {pageId:page.id,Company:text_(p.Company),Position:text_(p.Position),Location:websiteOptional_(p.Location),'Salary Range':websiteOptional_(p['Salary Range']),Website:text_(p.Website,true),Status:p.Status.select?p.Status.select.name:'','Apply Date':p['Apply Date'].date?p['Apply Date'].date.start.slice(0,10):''};
 }
 function websitePages_() {
   const pages=[],seen=new Set();let cursor;
@@ -151,13 +195,19 @@ function websiteDuplicate_(page,pages,keys,details) {
   });
   candidates.sort((a,b)=>score(b)-score(a)||String(a.created_time||'').localeCompare(String(b.created_time||''))||a.id.localeCompare(b.id));
   if(candidates[0]&&candidates[0].id!==page.id)return {state:'duplicate',reason:'Same job link already exists. This duplicate row is skipped, not deleted.'};
-  if(details&&pages.some(p=>!candidates.some(c=>c.id===p.id)&&norm_(websiteRow_(p).Company)===norm_(details.Company)&&norm_(websiteRow_(p).Position)===norm_(details.Position)))return {state:'review',reason:'Another row has the same company and position. Review this possible duplicate before filling.'};
+  if(details&&norm_(details.Company)&&norm_(details.Position)&&pages.some(p=>!candidates.some(c=>c.id===p.id)&&norm_(websiteRow_(p).Company)===norm_(details.Company)&&norm_(websiteRow_(p).Position)===norm_(details.Position)))return {state:'review',reason:'Another row has the same company and position. Review this possible duplicate before filling.'};
   return null;
 }
-function websiteProposal_(row,details,date) {
-  for(const field of ['Company','Position'])if(norm_(row[field])&&norm_(row[field])!==norm_(details[field]))return Object.assign({},row,{state:'review',reason:'Existing '+field+' differs from the website. Review manually.'});
-  const values=Object.assign({},details,{'Apply Date':date||'Today when confirmed'}),fields=['Company','Position','Status','Apply Date'].filter(k=>!norm_(row[k]));
-  return Object.assign({},values,row,...fields.map(k=>({[k]:values[k]})),{Website:details.Website,fields,state:fields.length?'ready':'complete',reason:fields.length?'Fill: '+fields.join(', ')+'. Keep the original Website link.':'All fields already have values.'});
+function websiteFields_(page) {
+  return ['Company','Position','Status','Apply Date',...['Location','Salary Range'].filter(k=>page.properties[k]&&page.properties[k].type==='rich_text')];
+}
+function websiteProposal_(row,details,date,fields) {
+  fields=fields||['Company','Position','Status','Apply Date'];
+  for(const field of ['Company','Position'])if(norm_(row[field])&&norm_(details[field])&&norm_(row[field])!==norm_(details[field]))return Object.assign({},row,{state:'review',reason:'Existing '+field+' differs from the website. Review manually.'});
+  const values=Object.assign({},details,{'Apply Date':date||'Today when confirmed'});
+  const missing=fields.filter(k=>!norm_(row[k])),available=missing.filter(k=>norm_(values[k])),unavailable=missing.filter(k=>!norm_(values[k]));
+  const reason=(available.length?'Fill: '+available.join(', ')+'. ':'No available values to fill. ')+(unavailable.length?'Not found: '+unavailable.join(', ')+'. ':'')+'Original Website and existing values are kept.';
+  return Object.assign({},values,row,...available.map(k=>({[k]:values[k]})),{Website:details.Website,fields:available,state:available.length?'ready':'review',reason});
 }
 function previewWebsiteRows(cursor,date) {
   if(date)websiteDate_(date);
@@ -167,7 +217,8 @@ function previewWebsiteRows(cursor,date) {
   const source=dataSource_(),pages=websitePages_().sort((a,b)=>a.id.localeCompare(b.id)),results=[],entries=[],resolved=[];
   for(const page of pages.slice(offset,offset+5)) {
     const row=websiteRow_(page);if(!norm_(row.Website))continue;
-    if(['Company','Position','Status','Apply Date'].every(k=>norm_(row[k])))continue;
+    const fields=websiteFields_(page);
+    if(fields.every(k=>norm_(row[k])))continue;
     let display=Object.assign({},row,{Website:''});
     try {
       const urls=websiteLinks_(row.Website);
@@ -179,10 +230,13 @@ function previewWebsiteRows(cursor,date) {
       duplicate=websiteDuplicate_(page,pages,details.keys,details);
       if(!duplicate&&resolved.some(x=>x.keys.some(k=>details.keys.includes(k))))duplicate={state:'duplicate',reason:'This job already appears in this preview batch.'};
       if(duplicate){results.push(Object.assign({},display,duplicate));continue;}
-      const proposal=websiteProposal_(display,details,date);results.push(proposal);
+      const proposal=websiteProposal_(display,details,date,fields);
+      const unsupported=['Location','Salary Range'].filter(k=>page.properties[k]&&page.properties[k].type!=='rich_text');
+      if(unsupported.length)proposal.reason+=' Not filled: '+unsupported.join(', ')+' needs a Text property.';
+      results.push(proposal);
       if(proposal.state==='ready') {
         resolved.push(details);
-        entries.push({pageId:page.id,edited:page.last_edited_time,url:urls[0],Company:details.Company,Position:details.Position,keys:details.keys});
+        entries.push({pageId:page.id,edited:page.last_edited_time,url:urls[0],values:Object.fromEntries(proposal.fields.filter(k=>k!=='Apply Date').map(k=>[k,proposal[k]])),fields:proposal.fields,keys:details.keys});
       }
     }catch(e){results.push(Object.assign({},display,{state:'review',reason:e.message}));}
   }
@@ -209,18 +263,18 @@ function fillWebsiteRows(ticket,today) {
         const urls=websiteLinks_(row.Website);
         if(page.last_edited_time!==entry.edited||urls.length!==1||urls[0]!==entry.url){results.push(Object.assign({},display,{state:'review',reason:'The row changed after preview. Preview again.'}));continue;}
         const details=websiteRead_(entry.url);
-        if(norm_(details.Company)!==norm_(entry.Company)||norm_(details.Position)!==norm_(entry.Position)){results.push(Object.assign({},display,{state:'review',reason:'Job details changed after preview. Preview again.'}));continue;}
+        if(Object.entries(entry.values).some(([field,value])=>norm_(details[field])!==norm_(value))){results.push(Object.assign({},display,{state:'review',reason:'Job details changed after preview. Preview again.'}));continue;}
         const duplicate=websiteDuplicate_(page,pages,details.keys,details);
         if(duplicate){results.push(Object.assign({},display,duplicate));continue;}
-        const proposal=websiteProposal_(display,details,preview.date||today);
+        const proposal=websiteProposal_(display,details,preview.date||today,websiteFields_(page).filter(k=>entry.fields.includes(k)));
         if(proposal.state!=='ready'){results.push(proposal);continue;}
         const properties={},rt=value=>[{type:'text',text:{content:value}}];
-        for(const field of proposal.fields)properties[field]=field==='Company'?{title:rt(proposal[field])}:field==='Position'?{rich_text:rt(proposal[field])}:field==='Status'?{select:{name:'Applied'}}:{date:{start:proposal[field]}};
+        for(const field of proposal.fields)properties[field]=field==='Company'?{title:rt(proposal[field])}:['Position','Location','Salary Range'].includes(field)?{rich_text:rt(proposal[field])}:field==='Status'?{select:{name:'Applied'}}:{date:{start:proposal[field]}};
         // Update only blanks. Website already supplied by the user stays intact.
         notion_('pages/'+entry.pageId,'patch',{properties});
         Object.assign(page.properties,properties);
         // Preserve Notion property types for the following duplicate checks.
-        for(const field of Object.keys(properties))page.properties[field].type=field==='Company'?'title':field==='Position'?'rich_text':field==='Status'?'select':'date';
+        for(const field of Object.keys(properties))page.properties[field].type=field==='Company'?'title':['Position','Location','Salary Range'].includes(field)?'rich_text':field==='Status'?'select':'date';
         const index=pages.findIndex(p=>p.id===page.id);if(index>=0)pages[index]=page;
         results.push(Object.assign({},proposal,{state:'filled',reason:'Blank fields filled. Original Website link preserved.'}));
       }catch(e){results.push(Object.assign({},display,{state:'error',reason:e.message}));break;}

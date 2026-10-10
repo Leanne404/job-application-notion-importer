@@ -92,6 +92,36 @@ for(const change of ['edit','parent','source','details']){
  assert.equal(ctx.previewWebsiteRows().nextCursor,'5');assert.equal(ctx.previewWebsiteRows('5').nextCursor,null);
  ctx.notion_=()=>({results:[],has_more:true,next_cursor:'again'});assert.throws(()=>ctx.websitePages_(),/pagination/);
 }
+// Best-effort optional fields: partial pages still produce useful updates.
+assert.equal(c.websiteParse_(html({...posting,title:undefined,jobLocation:{address:{addressLocality:'Austin',addressRegion:'TX',addressCountry:'US'}},baseSalary:{currency:'USD',value:{minValue:100000,maxValue:150000,unitText:'YEAR'}}}),url).Location,'Austin, TX, US');
+assert.equal(c.websiteSalary_({currency:'USD',value:{minValue:100000,maxValue:150000,unitText:'YEAR'}}),'USD 100,000–150,000 / year');
+assert.equal(c.websiteSalary_({currency:'usd',value:{value:25.1234,unitText:'hour'}}),'USD 25.1234 / hour');
+assert.equal(c.websiteSalary_({currency:'USD',value:{minValue:100,maxValue:50}}),'');
+assert.equal(c.websiteSalary_({currency:'USD',value:{value:100}}),'USD 100 (period unspecified)');
+assert.equal(c.websiteLocation_({jobLocationType:'TELECOMMUTE',applicantLocationRequirements:[{name:'United States'}]}),'Remote (United States)');
+{
+ const {ctx,page,writes}=fixture();page.properties.Location={type:'rich_text',rich_text:[]};page.properties['Salary Range']={type:'rich_text',rich_text:[]};
+ ctx.websiteRead_=()=>({Company:'',Position:'Engineer',Location:'Austin, TX','Salary Range':'USD 100,000–150,000 / year',Website:url,Status:'Applied',keys:[ctx.websiteKey_(url)]});
+ const preview=ctx.previewWebsiteRows();assert.equal(preview.results[0].state,'ready');assert.match(preview.results[0].reason,/Not found: Company/);
+ ctx.fillWebsiteRows(preview.ticket,'2020-01-01');assert(!writes[0].properties.Company);assert.equal(writes[0].properties.Location.rich_text[0].text.content,'Austin, TX');assert(writes[0].properties['Salary Range']);
+}
+{
+ const {ctx,page,writes}=fixture();page.properties.Location={type:'rich_text',rich_text:[{text:{content:'Existing location'}}]};page.properties['Salary Range']={type:'number',number:null};
+ ctx.websiteRead_=()=>({Company:'Example',Position:'Engineer',Location:'Different location','Salary Range':'USD 100–150 / hour',Website:url,Status:'Applied',keys:[ctx.websiteKey_(url)]});
+ const preview=ctx.previewWebsiteRows();assert.match(preview.results[0].reason,/Salary Range needs a Text property/);
+ ctx.fillWebsiteRows(preview.ticket,'2020-01-01');assert(!writes[0].properties.Location);assert(!writes[0].properties['Salary Range']);
+}
+{
+ const {ctx,page,writes}=fixture();page.properties.Company.title=[{text:{content:'Example & Co'}}];page.properties.Position.rich_text=[{text:{content:'Software Engineer'}}];page.properties.Status.select={name:'Applied'};page.properties['Apply Date'].date={start:'2020-01-01'};page.properties.Location={type:'rich_text',rich_text:[]};
+ ctx.websiteRead_=()=>({Company:'Example & Co',Position:'Software Engineer',Location:'Remote',Website:url,Status:'Applied',keys:[ctx.websiteKey_(url)]});
+ const preview=ctx.previewWebsiteRows();assert.equal(preview.results[0].state,'ready');ctx.fillWebsiteRows(preview.ticket,'2020-01-01');assert.deepEqual(Object.keys(writes[0].properties),['Location']);
+}
+{
+ const {ctx,page,writes}=fixture();page.properties.Location={type:'rich_text',rich_text:[]};
+ const preview=ctx.previewWebsiteRows();ctx.websiteRead_=()=>({Company:'Example & Co',Position:'Software Engineer',Location:'New location after preview',Website:url,Status:'Applied',keys:[ctx.websiteKey_(url)]});
+ ctx.fillWebsiteRows(preview.ticket,'2020-01-01');assert(!writes[0].properties.Location,'Only previewed available values may be written');
+}
+console.log('Partial extraction, locations, salary units, existing values, optional property types and approved-field writes passed.');
 console.log('No Gmail calls, read-only previews, update-only writes, existing values, dates, duplicates, stale rows and pagination passed.');
 (async()=>{
  const elements=new Map();const element=()=>({value:'',disabled:false,hidden:false,textContent:'',children:[],checkValidity:()=>true,append(x){this.children.push(x);},replaceChildren(){this.children=[];},setAttribute(k,v){this[k]=v;}});
