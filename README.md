@@ -79,9 +79,9 @@ If Google shows an unverified-app notice, confirm it is your own project and the
 Already pasted LinkedIn job links into **Website**? Use the separate **Fill existing rows** panel:
 
 1. Enable **Update content** for your Notion connection, in addition to Read and Insert content.
-2. Click **Preview missing details**, then **Fill blank fields** within 30 minutes.
+2. Optionally choose **Apply Date** (blank means your local date when you click **Fill blank fields**). Click **Preview missing details**, then **Fill blank fields** within 30 minutes.
 
-The tool matches each Website job ID to an English or Traditional Chinese Gmail application confirmation and fills blank **Company, Position, Apply Date, and Status (`Applied`)**. It updates existing rows; filled values, Website, Location, icons, and other content are preserved. No matching email, conflicting details, or unsupported links require manual review. Apply Date comes from the confirmation, not the job posting date. This feature is available in the web app only.
+The tool reads the public LinkedIn job page from Website, without Gmail, and fills blank **Company, Position, Apply Date, and Status (`Applied`)**. It updates existing rows; filled values, Website, Location, icons, and other content are preserved. Duplicate LinkedIn job IDs are checked across the database before preview and again before updates. One row is kept as the update target (prefer more filled fields, then the oldest row); other copies are skipped and flagged, never deleted. Tracking parameters and job-title URLs are normalized by job ID. Login restrictions, unavailable pages, conflicting details, or pages without readable job data require manual review. Apply Date is your chosen date or the confirmation-day date, never the job posting date. Only LinkedIn job links are supported. This feature is available in the web app only.
 
 To update an existing deployment, replace Apps Script `Code.gs` with the latest `SingleFile.gs`, then **Deploy → Manage deployments → Edit → New version → Deploy** and refresh your existing URL. Your saved Notion settings remain available.
 
@@ -280,9 +280,9 @@ References: [Apps Script deployment](https://developers.google.com/apps-script/g
 已經把 LinkedIn 職缺連結貼到 **Website**？使用獨立的 **Fill existing rows** 區塊：
 
 1. 在 Notion 連線權限加開 **Update content（更新）**，原本的 Read、Insert 保留。
-2. 按 **Preview missing details** 預覽，再於 30 分鐘內按 **Fill blank fields**。
+2. 可自行選 **Apply Date**；留空就用按下 **Fill blank fields** 時的本地日期。按 **Preview missing details** 預覽，再於 30 分鐘內按 **Fill blank fields**。
 
-工具會依 Website 職缺編號比對 Gmail 中英文／繁體中文申請確認信，補上空白的 **Company、Position、Apply Date、Status（Applied）**。只更新原有資料；已有值、Website、Location、圖示和其他內容都保留。找不到信、資料衝突或連結不支援時，需要人工確認。申請日期取自確認信，不是職缺發布日期。此功能只在網頁版提供。
+工具會直接讀取 Website 中的 LinkedIn 公開職缺網頁，不依賴 Gmail，補上空白的 **Company、Position、Apply Date、Status（Applied）**。只更新原有資料；已有值、Website、Location、圖示和其他內容都保留。預覽及寫入前都會檢查整個資料庫的重複職缺編號，只補一筆（優先已有較多資料的列，再選最早建立的列）；其餘標示重複並跳過，不會刪除。追蹤參數與含職稱的網址會按職缺編號比對。需登入、網頁無法讀取、缺少可辨識資料或欄位衝突時，需人工確認。申請日期使用你指定的日期，留空則用按下確認當天，不使用職缺發布日期。目前只支援 LinkedIn 職缺連結。此功能只在網頁版提供。
 
 更新已部署的網頁：用最新 `SingleFile.gs` 取代 Apps Script 的 `Code.gs`，按 **部署 → 管理部署 → 編輯 → 新版本 → 部署**，再重新整理原網址。原 Notion 設定可沿用。
 
