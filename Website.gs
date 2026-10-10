@@ -178,24 +178,27 @@ function websiteRow_(page) {
   const p=page.properties;
   return {pageId:page.id,Company:text_(p.Company),Position:text_(p.Position),Location:websiteOptional_(p.Location),'Salary Range':websiteOptional_(p['Salary Range']),Website:text_(p.Website,true),Status:p.Status.select?p.Status.select.name:'','Apply Date':p['Apply Date'].date?p['Apply Date'].date.start.slice(0,10):''};
 }
+function websitePageId_(page) { return String(page.id||'').replace(/-/g,'').toLowerCase(); }
+function websiteComplete_(row) { return ['Company','Position','Status','Apply Date'].every(k=>norm_(row[k])); }
 function websitePages_() {
-  const pages=[],seen=new Set();let cursor;
+  const pages=new Map(),seen=new Set();let cursor;
   do {
     const response=notion_('data_sources/'+dataSource_()+'/query','post',{page_size:100,...(cursor?{start_cursor:cursor}:{})});
-    pages.push(...response.results);cursor=response.has_more?response.next_cursor:null;
+    for(const page of response.results){const id=websitePageId_(page);if(!id)throw Error('A Notion row has no ID. Preview again.');pages.set(id,page);}
+    cursor=response.has_more?response.next_cursor:null;
     if(response.has_more&&(!cursor||seen.has(cursor)))throw Error('Notion pagination is incomplete. Preview again.');
     if(cursor)seen.add(cursor);
   }while(cursor);
-  return pages;
+  return [...pages.values()];
 }
 function websiteDuplicate_(page,pages,keys,details) {
   const score=p=>{const r=websiteRow_(p);return ['Company','Position','Apply Date','Status'].filter(k=>norm_(r[k])).length;};
   const candidates=pages.filter(p=>{
-    try{return p.id===page.id||websiteLinks_(websiteRow_(p).Website).some(url=>keys.includes(websiteKey_(url)));}catch(e){return p.id===page.id;}
+    try{return websitePageId_(p)===websitePageId_(page)||websiteLinks_(websiteRow_(p).Website).some(url=>keys.includes(websiteKey_(url)));}catch(e){return websitePageId_(p)===websitePageId_(page);}
   });
   candidates.sort((a,b)=>score(b)-score(a)||String(a.created_time||'').localeCompare(String(b.created_time||''))||a.id.localeCompare(b.id));
-  if(candidates[0]&&candidates[0].id!==page.id)return {state:'duplicate',reason:'Same job link already exists. This duplicate row is skipped, not deleted.'};
-  if(details&&norm_(details.Company)&&norm_(details.Position)&&pages.some(p=>!candidates.some(c=>c.id===p.id)&&norm_(websiteRow_(p).Company)===norm_(details.Company)&&norm_(websiteRow_(p).Position)===norm_(details.Position)))return {state:'review',reason:'Another row has the same company and position. Review this possible duplicate before filling.'};
+  if(candidates[0]&&websitePageId_(candidates[0])!==websitePageId_(page))return {state:'duplicate',reason:'Same job link already exists. This duplicate row is skipped, not deleted.'};
+  if(details&&norm_(details.Company)&&norm_(details.Position)&&pages.some(p=>!candidates.some(c=>websitePageId_(c)===websitePageId_(p))&&norm_(websiteRow_(p).Company)===norm_(details.Company)&&norm_(websiteRow_(p).Position)===norm_(details.Position)))return {state:'review',reason:'Another row has the same company and position. Review this possible duplicate before filling.'};
   return null;
 }
 function websiteFields_(page) {
@@ -218,7 +221,7 @@ function previewWebsiteRows(cursor,date) {
   for(const page of pages.slice(offset,offset+5)) {
     const row=websiteRow_(page);if(!norm_(row.Website))continue;
     const fields=websiteFields_(page);
-    if(fields.every(k=>norm_(row[k])))continue;
+    if(websiteComplete_(row))continue;
     let display=Object.assign({},row,{Website:''});
     try {
       const urls=websiteLinks_(row.Website);
@@ -260,6 +263,7 @@ function fillWebsiteRows(ticket,today) {
         const parent=page.parent&&page.parent.data_source_id;
         if(page.archived||page.in_trash||String(parent||'').replace(/-/g,'')!==source.replace(/-/g,''))throw Error('The row is no longer in the connected database.');
         display=Object.assign({},row,{Website:entry.url});
+        if(websiteComplete_(row)){results.push(Object.assign({},display,{state:'complete',reason:'Company, Position, Status and Apply Date are already filled. Skipped.'}));continue;}
         const urls=websiteLinks_(row.Website);
         if(page.last_edited_time!==entry.edited||urls.length!==1||urls[0]!==entry.url){results.push(Object.assign({},display,{state:'review',reason:'The row changed after preview. Preview again.'}));continue;}
         const details=websiteRead_(entry.url);
@@ -275,7 +279,7 @@ function fillWebsiteRows(ticket,today) {
         Object.assign(page.properties,properties);
         // Preserve Notion property types for the following duplicate checks.
         for(const field of Object.keys(properties))page.properties[field].type=field==='Company'?'title':['Position','Location','Salary Range'].includes(field)?'rich_text':field==='Status'?'select':'date';
-        const index=pages.findIndex(p=>p.id===page.id);if(index>=0)pages[index]=page;
+        const index=pages.findIndex(p=>websitePageId_(p)===websitePageId_(page));if(index>=0)pages[index]=page;
         results.push(Object.assign({},proposal,{state:'filled',reason:'Blank fields filled. Original Website link preserved.'}));
       }catch(e){results.push(Object.assign({},display,{state:'error',reason:e.message}));break;}
     }
