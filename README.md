@@ -4,9 +4,25 @@
 
 ## English
 
-Import LinkedIn application confirmation emails from **Gmail into your Notion job tracker**. Choose receipt dates, preview the results, and confirm the import.
+Keep your **Notion job tracker** up to date in two ways: import LinkedIn application confirmation emails from Gmail, or fill existing rows from LinkedIn job links. Preview the results before confirming any changes. The interface and prompts are English; Gmail import supports English and Traditional Chinese confirmations.
 
-The tool fills **Company, Position, Status, Website, and Apply Date**. It checks for duplicates, sets new records to `Applied`, and preserves existing records. It supports **English and Traditional Chinese emails**; the interface and prompts are English.
+### What it does and how to use it
+
+**1. Import applications from Gmail — web app or terminal**
+
+- You do not need to enter each application in Notion. After setup, choose the **received-date range** to search; leave either date blank for no bound.
+- In the web app, click **Check and preview**, review the companies, positions, dates, and duplicate checks, then click **Import new applications**. The terminal provides the same preview/import workflow through commands shown below.
+- Each new row gets **Company, Position, Website, and Apply Date** from the confirmation email, with **Status = Applied**. Apply Date is the application date stated in the email, which may differ from its received date.
+- Matching existing jobs are skipped; uncertain duplicates and unsupported emails are flagged for manual review. Existing rows and their statuses are preserved.
+
+**2. Fill rows from job links — web app only**
+
+- In your Notion table, create a row and paste a **LinkedIn job URL into Website**. You can leave Company, Position, Status, and Apply Date blank. Repeat for other jobs.
+- Open **Fill existing rows** in the tool. Optionally choose **Apply Date** for this batch; leaving it blank uses your local date when you click **Fill blank fields**.
+- Click **Preview missing details**, review the results, then **Fill blank fields**. The tool reads the public job page to fill blank Company and Position, sets blank Status to `Applied`, and fills blank Apply Date. **This workflow does not look for Gmail confirmations.**
+- It checks the whole database for repeated LinkedIn job IDs before preview and again before writing. Duplicate rows are flagged and skipped, never deleted. Existing values are preserved. Pages that require login, block access, or lack readable job details need manual review.
+
+Both workflows use the five Notion properties listed below. **Location and other properties are not filled or changed.** The tool records applications you have made; it does not apply to jobs for you. Installation, permissions, and the buttons or commands for each method are explained below.
 
 ### Choose how to run it
 
@@ -31,12 +47,12 @@ Use your existing tracker or create a Notion database with these **exact names a
 | Position | Text | Job title |
 | Status | Select, with an `Applied` option | Initial application status |
 | Website | Text | Clickable LinkedIn job link |
-| Apply Date | Date | Application date in the email |
+| Apply Date | Date | Gmail import: date stated in the email. Link fill: chosen date, or the day you confirm |
 
-`Status` must be **Select**, not Notion's Status type. Both Position and Website use **Text**. The tool does not change your database structure.
+`Status` must be **Select**, not Notion's Status type. Both Position and Website use **Text**. All five properties must exist, even if you leave row values blank for link fill. Extra properties may remain in your table. The tool does not change your database structure.
 
 1. Open [Notion integrations](https://www.notion.so/profile/integrations), create an **Internal integration / Internal connection**, and select your database's workspace.
-2. Enable **Read content** and **Insert content**. Copy the **Internal Integration Secret**; this is the Notion secret the tool will ask for.
+2. Enable **Read content** and **Insert content**; also enable **Update content** if you will fill existing rows from links. Copy the **Internal Integration Secret**; this is the Notion secret the tool will ask for.
 3. In Notion, open the original database → `…` → **Connections**, and add that connection.
 4. Open the database as a full page and copy its link. For **Job Finder → Job Tracker**, use the **Job Tracker database** link.
 
@@ -205,9 +221,25 @@ References: [Apps Script deployment](https://developers.google.com/apps-script/g
 
 ## 繁體中文
 
-把 **Gmail 裡的 LinkedIn 申請確認信，匯入 Notion 求職紀錄**。選擇收信日期、預覽結果，確認後再匯入。
+這個工具用兩種方式整理你的 **Notion 求職紀錄**：從 Gmail 匯入 LinkedIn 申請確認信，或依 LinkedIn 職缺連結補齊已有資料。所有變更都先預覽，再由你確認。介面與操作提示皆為英文；Gmail 匯入支援英文與繁體中文確認信。
 
-工具填入 **Company、Position、Status、Website、Apply Date**，檢查重複，新增狀態設為 `Applied`，並保留既有紀錄。支援**英文與繁體中文信件**，介面與操作提示皆為英文。
+### 有哪些功能、怎麼操作
+
+**1. 從 Gmail 匯入申請紀錄（網頁版／終端機版）**
+
+- 不必先在 Notion 手動建立每筆申請。完成設定後，選擇要搜尋的**收信日期範圍**；開始或結束日期留空，代表該方向不設限制。
+- 網頁版按 **Check and preview**，檢查公司、職稱、日期及去重結果，再按 **Import new applications**。終端機版也有相同的預覽／匯入流程，指令見下方。
+- 新增的資料會從確認信填入 **Company、Position、Website、Apply Date**，並設定 **Status = Applied**。Apply Date 是信內的申請日期，可能與收信日期不同。
+- 已有相同職缺就跳過；疑似重複或不支援的信件會標示人工確認。既有資料及狀態會保留。
+
+**2. 用職缺連結補齊資料（僅網頁版）**
+
+- 在 Notion 表格新增一列，把 **LinkedIn 職缺網址貼到 Website**；Company、Position、Status、Apply Date 可以留空。多個職缺就各放一列。
+- 打開工具的 **Fill existing rows** 區塊，可指定這批資料的 **Apply Date**；留空就用按下 **Fill blank fields** 時的本地日期。
+- 按 **Preview missing details** 預覽，檢查後按 **Fill blank fields**。工具直接讀公開職缺網頁，補上空白的公司、職稱，空白 Status 設為 `Applied`，並補申請日期。**這個流程不會搜尋 Gmail 確認信。**
+- 預覽與寫入前都會檢查整個資料庫的 LinkedIn 職缺編號；重複列標示並跳過，不會刪除。已有欄位值會保留。網站需登入、阻擋存取或缺少可讀資料時，需要人工確認。
+
+兩個功能都使用下方列出的五個 Notion 欄位；**Location 與其他欄位不會填寫或修改**。工具用來記錄你已完成的申請，不會替你投遞職缺。安裝、權限及各方式的按鈕／指令說明都在下方。
 
 ### 選一種執行方式
 
@@ -232,12 +264,12 @@ References: [Apps Script deployment](https://developers.google.com/apps-script/g
 | Position | 文字 / Text | 職位名稱 |
 | Status | 選取 / Select，包含 `Applied` 選項 | 初始申請狀態 |
 | Website | 文字 / Text | 可點擊的 LinkedIn 職缺連結 |
-| Apply Date | 日期 / Date | 信內應徵日期 |
+| Apply Date | 日期 / Date | Gmail 匯入用信內申請日期；連結補資料用指定日期，留空則用按下確認當天 |
 
-`Status` 要用 **Select**，不是 Notion 的 Status 類型；Position、Website 都用 **Text**。工具不會替你修改表格結構。
+`Status` 要用 **Select**，不是 Notion 的 Status 類型；Position、Website 都用 **Text**。五個欄位都必須存在，使用連結補資料時只是列內的值可以留空；表格可保留其他欄位。工具不會替你修改表格結構。
 
 1. 開啟 [Notion integrations](https://www.notion.so/profile/integrations)，建立 **Internal integration / Internal connection**，選資料庫所在的工作區。
-2. 開啟 **Read content（讀取）**、**Insert content（新增）**，複製 **Internal Integration Secret**。這就是工具要你貼的 Notion 密鑰。
+2. 開啟 **Read content（讀取）**、**Insert content（新增）**；若要用連結補齊已有資料，也開啟 **Update content（更新）**。複製 **Internal Integration Secret**。這就是工具要你貼的 Notion 密鑰。
 3. 回 Notion 開啟原始資料庫 → `…` → **Connections / 連線**，加入剛建立的連線。
 4. 將資料庫**開啟為整頁**並複製連結。若使用 **Job Finder → Job Tracker**，要複製 **Job Tracker 資料庫**的連結。
 
