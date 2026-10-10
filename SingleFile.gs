@@ -461,9 +461,18 @@ function websiteOptional_(p) {
   if(p.type==='multi_select')return (p.multi_select||[]).map(x=>x.name).join(', ');
   return '[Not editable]';
 }
+// Keep rich-text link targets separate from adjacent visible text fragments.
+function websiteProperty_(property) {
+  if(!property)return '';
+  if(property.type==='url')return property.url||'';
+  const parts=property[property.type]||[];
+  const visible=parts.map(x=>x.plain_text||(x.text&&x.text.content)||'').join('');
+  const targets=parts.map(x=>x.href||(x.text&&x.text.link&&x.text.link.url)||'').filter(Boolean);
+  return [visible,...targets].filter(Boolean).join(' ');
+}
 function websiteRow_(page) {
   const p=page.properties;
-  return {pageId:page.id,Company:text_(p.Company),Position:text_(p.Position),Location:websiteOptional_(p.Location),'Salary Range':websiteOptional_(p['Salary Range']),Website:text_(p.Website,true),Status:p.Status.select?p.Status.select.name:'','Apply Date':p['Apply Date'].date?p['Apply Date'].date.start.slice(0,10):''};
+  return {pageId:page.id,Company:text_(p.Company),Position:text_(p.Position),Location:websiteOptional_(p.Location),'Salary Range':websiteOptional_(p['Salary Range']),Website:websiteProperty_(p.Website),Status:p.Status.select?p.Status.select.name:'','Apply Date':p['Apply Date'].date?p['Apply Date'].date.start.slice(0,10):''};
 }
 function websitePageId_(page) { return String(page.id||'').replace(/-/g,'').toLowerCase(); }
 function websiteComplete_(row) { return ['Company','Position','Status','Apply Date'].every(k=>norm_(row[k])); }
@@ -544,7 +553,7 @@ function previewWebsiteRows(cursor,date) {
   const results=[],entries=[],resolved=[];
   for(const page of candidates.slice(offset,offset+5)) {
     const row=websiteRow_(page),fields=websiteFields_(page);
-    let display=Object.assign({},row,{Website:''});
+    let display=Object.assign({},row);
     try {
       const urls=websiteLinks_(row.Website);
       if(urls.length!==1)throw Error('Website must contain exactly one public job link.');

@@ -223,3 +223,16 @@ console.log('206-row performance case: one three-page Notion scan, six incomplet
  assert.equal(parse('The company makes recruiting tools.'),'');
  console.log('Explicit employer description fallback and ambiguous-name safeguards passed.');
 }
+
+{
+ const {ctx,page}=fixture();
+ page.properties.Website.rich_text=[{plain_text:url.slice(0,30),href:url},{plain_text:url.slice(30),href:url}];
+ assert.equal(ctx.previewWebsiteRows().results[0].state,'ready');
+ page.properties.Website.rich_text=[{text:{content:'Job',link:{url}}}];
+ assert.equal(ctx.previewWebsiteRows().results[0].state,'ready');
+ page.properties.Website.rich_text=[{text:{content:'not a URL'}}];
+ const bad=ctx.previewWebsiteRows().results[0];assert.equal(bad.state,'review');assert.equal(bad.Website,'not a URL');
+ page.properties.Website.rich_text=[{text:{content:url+' https://careers.example.com/other'}}];
+ assert.equal(ctx.previewWebsiteRows().results[0].state,'review');
+ console.log('Fragmented Notion links, hidden targets, and visible invalid input passed.');
+}
