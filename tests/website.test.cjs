@@ -159,9 +159,16 @@ console.log('No Gmail calls, read-only previews, update-only writes, existing va
  await get('websitePreview').onclick();assert.equal(websiteReads,1);assert.equal(gmailReads,0);assert.equal(get('websiteFill').disabled,false);assert.equal(get('rows').children.length,0);
  await get('websiteFill').onclick();assert.equal(websiteWrites,1);
  get('gmailMode').onclick();await get('preview').onclick();assert.equal(gmailReads,1);assert.equal(get('import').disabled,false);
- get('websiteMode').onclick();await get('websitePreview').onclick();get('websiteDate').onchange();assert.equal(get('websiteFill').disabled,true);assert.equal(get('import').disabled,false);
+ get('websiteMode').onclick();await get('websitePreview').onclick();get('websiteDate').value='2020-02-03';get('websiteDate').onchange();assert.equal(get('websiteFill').disabled,false);assert.equal(get('import').disabled,false);
  rpc.previewWebsiteRows=()=>{throw Error('Website blocked');};await get('websitePreview').onclick();assert.equal(get('websitePreview').disabled,false);assert.equal(get('import').disabled,false);
  rpc.previewWebsiteRows=()=>{throw Error('Script function not found: previewWebsiteRows');};await get('websitePreview').onclick();assert.match(get('websiteMessage').textContent,/SingleFile.gs/);assert.match(get('websiteMessage').textContent,/New version/);
  assert(!/\p{Script=Han}/u.test(markup));
  console.log('Two workflow buttons, separate RPCs/results, preview invalidation and English UI passed.');
 })().catch(e=>{console.error(e);process.exitCode=1;});
+
+// Date is an output setting and can change after preview without reading websites again.
+for(const selected of ['2020-02-03',null]){
+ const {ctx,writes}=fixture(),preview=ctx.previewWebsiteRows(null,'2020-01-01');
+ ctx.fillWebsiteRows(preview.ticket,'2020-03-04',selected);
+ assert.equal(writes[0].properties['Apply Date'].date.start,selected||'2020-03-04');
+}

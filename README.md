@@ -18,7 +18,7 @@ Keep your **Notion job tracker** up to date in two ways: import LinkedIn applica
 **2. Fill rows from job links — web app only**
 
 - In your Notion table, create a row and paste an **external job URL into Website**. Leave the fields you want filled blank, including Location and Salary Range if your table has them. Repeat for other jobs.
-- Open **Fill from Website** in the tool. Optionally choose **Apply Date** for this batch; leaving it blank uses your local date when you click **Fill blank fields**.
+- Open **Fill from Website** and click **Preview websites**. Below that button, **Apply Date to save in Notion** is the date to write into this batch, not a search filter. Leave it blank to use your local date when you click **Fill blank fields**.
 - Click **Preview websites**, review the results, then **Fill blank fields**. The tool reads the external job page to fill available blank Company, Position, Location and Salary Range, sets blank Status to `Applied`, and fills blank Apply Date. **Missing details stay blank; available fields can still be filled. This workflow does not look for Gmail confirmations.**
 - It checks the whole database for duplicate job URLs before preview and again before writing. Duplicate rows are flagged and skipped, never deleted. Existing values are preserved. Pages that require login, block access, or lack readable job details need manual review.
 
@@ -105,8 +105,9 @@ The two workflow buttons are **LinkedIn Gmail import** and **Fill from Website**
 
 1. In Notion, put an **external job URL in Website**, one job per row. Leave the fields you want filled blank.
 2. Enable **Update content** for the Notion connection, then open **Fill from Website** in the tool.
-3. Optionally choose **Apply Date** for this batch. Leave it blank to use your local date when you confirm.
-4. Click **Preview websites**, check the available company, position, location, salary, date and duplicate results, then **Fill blank fields** within 30 minutes.
+3. Click **Preview websites** and review the available details and duplicate results.
+4. Below the preview button, optionally choose **Apply Date to save in Notion**. This is the date to write into blank Notion Apply Date fields, **not a search filter**. Leave it blank to use your local date when you confirm. Existing dates stay unchanged; changing this date does not require another preview.
+5. Review the date and click **Fill blank fields** within 30 minutes of previewing.
 
 It fills whatever it can find: blank **Company, Position, Location, Salary Range**, plus **Apply Date and Status (`Applied`)**. Missing details stay blank; they do not prevent other available fields from being filled. Your supplied **Website link stays intact**, as do existing values, icons and other content. **Rows with Company, Position, Status and Apply Date already filled are skipped entirely**, even if Location or Salary Range is blank. Rows without Website are also skipped. **Location** and **Salary Range** are optional **Text** properties; absent or differently typed properties are not changed. Salary text retains the published currency, range and pay period when provided; no salary or annual conversion is guessed. This workflow does not read Gmail or create new Notion rows.
 
@@ -259,7 +260,7 @@ References: [Apps Script deployment](https://developers.google.com/apps-script/g
 **2. 用職缺連結補齊資料（僅網頁版）**
 
 - 在 Notion 表格新增一列，把 **外部職缺網址貼到 Website**；想讓工具補的欄位留空，包含表格中選用的 Location、Salary Range。多個職缺就各放一列。
-- 打開工具的 **Fill from Website** 區塊，可指定這批資料的 **Apply Date**；留空就用按下 **Fill blank fields** 時的本地日期。
+- 打開工具的 **Fill from Website**，按 **Preview websites** 預覽。按鈕下方的 **Apply Date to save in Notion** 是這批資料要寫入的申請日期，**不是搜尋條件**；留空就用按下 **Fill blank fields** 時的本地日期。
 - 按 **Preview websites** 預覽，檢查後按 **Fill blank fields**。工具直接讀公開職缺網頁，盡量補上空白的公司、職稱、地點及薪資範圍，空白 Status 設為 `Applied`，並補申請日期。**抓不到的欄位留空，其他抓到的仍可填入；這個流程不會搜尋 Gmail 確認信。**
 - 預覽與寫入前都會檢查整個資料庫的重複職缺網址；重複列標示並跳過，不會刪除。已有欄位值會保留。網站需登入、阻擋存取或缺少可讀資料時，需要人工確認。
 
@@ -346,8 +347,9 @@ Website 補資料還可使用以下選用欄位，名稱需完全相符：
 
 1. 在 Notion 的 **Website 貼外部職缺網址**，一個職缺一列；想讓工具補的欄位留空。
 2. 在 Notion 連線開啟 **Update content（更新）**，然後打開工具的 **Fill from Website**。
-3. 可指定這批資料的 **Apply Date**；留空就用按下確認時的本地日期。
-4. 按 **Preview websites**，檢查抓到的公司、職稱、地點、薪資、日期和去重結果，再於 30 分鐘內按 **Fill blank fields**。
+3. 按 **Preview websites**，檢查抓到的資料和去重結果。
+4. 在預覽按鈕下方，可選填 **Apply Date to save in Notion**。這是要寫入 Notion 空白 Apply Date 欄位的日期，**不是搜尋條件**；留空就用按下確認時的本地日期。已有日期保留，改選日期不必重新預覽。
+5. 確認日期後，在預覽後 30 分鐘內按 **Fill blank fields**。
 
 工具會盡量補抓得到的空白 **Company、Position、Location、Salary Range**，以及 **Apply Date、Status（Applied）**。缺少的資料留空，不會擋住其他抓到的欄位。你貼的 **Website 原始連結會保留**；已有欄位值、圖示和其他內容也保留。**Company、Position、Status、Apply Date 都有值的列會直接跳過**，即使 Location 或 Salary Range 空白，也不會重新抓取或檢查該列。沒有 Website 的列也會跳過。**Location、Salary Range** 是選用的**文字 / Text** 欄位；不存在或類型不同時不修改。薪資保留網站提供的幣別、範圍及計薪週期，不猜金額，也不擅自換算年薪。此流程不讀 Gmail，也不新增 Notion 列。
 
