@@ -10,7 +10,24 @@ function doGet() {
   return HtmlService.createHtmlOutputFromFile('Index').setTitle('Job Application Notion Importer');
 }
 function norm_(s) { return String(s || '').normalize('NFKC').toLowerCase().replace(/\s+/g,' ').trim(); }
-function ids_(s) { return [...String(s || '').matchAll(/https?:\/\/(?:[\w-]+\.)?linkedin\.com\/(?:comm\/)?jobs\/view\/(\d+)/gi)].map(m=>m[1]); }
+function ids_(s) {
+  const ids=new Set();
+  // Recognize the same job across numeric, title-slug, and selected-job URLs.
+  const links=String(s||'').replace(/&amp;/gi,'&').match(/https?:\/\/[^\s<>"']+/gi)||[];
+  for(const raw of links) {
+    const link=raw.replace(/[)\]},.;!）】。，]+$/g,'');
+    const url=link.match(/^https?:\/\/(?:[a-z\d-]+\.)?linkedin\.com((?:\/[^?#]*)?)(?:\?([^#]*))?(?:#.*)?$/i);
+    if(!url)continue;
+    const path=url[1],view=path.match(/^\/(?:comm\/)?jobs\/view\/(?:[^/]*-)?(\d+)\/?$/i);
+    if(view)ids.add(view[1]);
+    if(/^\/(?:comm\/)?jobs(?:\/|$)/i.test(path)) {
+      for(const part of (url[2]||'').split('&')) {
+        const selected=part.match(/^currentJobId=(\d+)$/i);if(selected)ids.add(selected[1]);
+      }
+    }
+  }
+  return [...ids];
+}
 function confirmationCompany_(line) {
   const m=String(line||'').trim().match(/^(?:您的應徵資料已傳送到|Your application (?:was|has been) sent to)\s*(.+)$/i);
   return m ? m[1].trim() : null;
@@ -63,8 +80,8 @@ function decision_(a, rows) {
   for (const b of rows) {
     if (norm_(a.Company)!==norm_(b.Company)) continue;
     const bi=ids_((b.Website||'')+' '+(b.Position||''));
-    if (ai.length && bi.length) continue;
     const pos=norm_(a.Position)===norm_(b.Position), day=a['Apply Date']===b['Apply Date'];
+    if(pos && ai.length && bi.length) {uncertain={state:'review',reason:'Same company and position with a different LinkedIn job ID. Review before importing.',url:b.url||''};continue;}
     if(pos && day) return {state:'duplicate',reason:'Same company, position, and application date.',url:b.url||''};
     if(pos || (!b.Position && day)) uncertain={state:'review',reason:'Possible existing application. Review manually.',url:b.url||''};
   }
@@ -156,16 +173,17 @@ function text_(p, links) {
   return (p[p.type]||[]).map(x=>(x.plain_text || (x.text&&x.text.content) || '')+(links&&x.href?' '+x.href:'')).join('');
 }
 function existing_() {
-  let cursor, rows=[];
+  let cursor, rows=[], seen=new Set();
   do {
     const body={page_size:100}; if(cursor) body.start_cursor=cursor;
     const page=notion_('data_sources/'+dataSource_()+'/query','post',body);
     rows.push(...page.results.map(r=>{
       const p=r.properties;
-      return {url:r.url,Company:text_(p.Company),Position:text_(p.Position),Website:text_(p.Website,true),
+      return {url:r.url,Company:text_(p.Company),Position:text_(p.Position),Website:[text_(p.Website,true),text_(p.Position,true)].join(' '),
         'Apply Date':p['Apply Date']&&p['Apply Date'].date?p['Apply Date'].date.start.slice(0,10):''};
     }));
-    if(page.has_more && !page.next_cursor) throw Error('Notion pagination is incomplete. Import stopped.');
+    if(page.has_more && (!page.next_cursor || seen.has(page.next_cursor))) throw Error('Notion pagination is incomplete or repeated. Import stopped.');
+    if(page.next_cursor)seen.add(page.next_cursor);
     cursor=page.has_more?page.next_cursor:null;
   } while(cursor);
   return rows;

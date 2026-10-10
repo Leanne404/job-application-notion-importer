@@ -9,7 +9,7 @@ assert.equal(ctx.decision_(a,[]).state,'new');
 assert.equal(ctx.decision_(a,[a]).state,'duplicate');
 assert.equal(ctx.decision_(a,[{...a,Website:a.Website+'?tracking=other',Company:'Changed name'}]).state,'duplicate');
 assert.equal(ctx.decision_(a,[{...a,Company:'  EXAMPLE COMPANY ',Website:''}]).state,'duplicate');
-assert.equal(ctx.decision_(a,[{...a,Website:'https://www.linkedin.com/jobs/view/999/'}]).state,'new');
+assert.equal(ctx.decision_(a,[{...a,Website:'https://www.linkedin.com/jobs/view/999/'}]).state,'review');
 assert.equal(ctx.decision_(a,[{...a,Website:'','Apply Date':'2019-01-02'}]).state,'review');
 assert.throws(()=>ctx.parse_({...sample,sender:'not-a-sender'}));
 assert.throws(()=>ctx.parse_({...sample,body:sample.body.replace('2020年1月2日','2020年2月31日')}));
@@ -197,3 +197,38 @@ assert.equal(ctx.body_({mimeType:'multipart/alternative',parts:[
 ]}),plain);
 assert.equal(base64Calls,1,'Gmail bytes from Apps Script must not be decoded as base64 again');
 console.log('Gmail body decoding accepts both base64url text and Apps Script byte arrays.');
+
+// Gmail duplicate regression: alternate LinkedIn URL forms and reposted IDs.
+const dedupeCtx={};vm.createContext(dedupeCtx);vm.runInContext(fs.readFileSync('Code.gs','utf8'),dedupeCtx);
+for(const link of [
+ `https://www.linkedin.com/jobs/view/engineer-at-example-${job}/?tracking=example`,
+ `https://tw.linkedin.com/comm/jobs/view/engineer-at-example-${job}`,
+ `https://www.linkedin.com/jobs/search/?keywords=engineer&currentJobId=${job}`,
+ `https://www.linkedin.com/jobs/collections/recommended/?foo=bar&amp;currentJobId=${job}`
+]){
+ assert.equal(dedupeCtx.ids_(link)[0],job);
+ assert.equal(dedupeCtx.decision_(a,[{Website:link,Company:'',Position:'','Apply Date':''}]).state,'duplicate');
+ assert.equal(dedupeCtx.parse_({...sample,body:sample.body.replace(a.Website+'?tracking=example',link)}).Website,a.Website);
+}
+for(const bad of [`https://linkedin.com.evil.example/jobs/view/${job}/`,`https://example.com/jobs/view/${job}/`,`https://www.linkedin.com/jobs/view/${job}abc/`])assert.equal(dedupeCtx.ids_(bad).length,0);
+assert.equal(dedupeCtx.decision_(a,[{...a,Website:'https://www.linkedin.com/jobs/view/999/'}]).state,'review');
+assert.equal(dedupeCtx.decision_(a,[{...a,Position:'Different Role',Website:'https://www.linkedin.com/jobs/view/999/'}]).state,'new');
+dedupeCtx.dataSource_=()=>source;
+dedupeCtx.notion_=()=>({results:[{properties:{Company:{type:'title',title:[]},Position:{type:'rich_text',rich_text:[{plain_text:'Engineer',href:a.Website}]},Website:{type:'rich_text',rich_text:[]},'Apply Date':{date:null}}}],has_more:false});
+assert.equal(dedupeCtx.decision_(a,dedupeCtx.existing_()).state,'duplicate');
+dedupeCtx.notion_=()=>({results:[],has_more:true,next_cursor:'repeated'});assert.throws(()=>dedupeCtx.existing_(),/repeated/);
+console.log('Gmail duplicate checks handle job-title links, currentJobId, hidden links, reposted IDs and repeated cursors.');
+
+assert.equal(dedupeCtx.ids_('('+a.Website+')')[0],job);
+// Web import rechecks alternate links even with a ticket from an earlier preview.
+const webDedupe={};vm.createContext(webDedupe);vm.runInContext(fs.readFileSync('Code.gs','utf8'),webDedupe);
+let createAttempts=0;const webCache=new Map();
+webDedupe.dataSource_=()=>source;webDedupe.checkSchema_=()=>{};webDedupe.defaultPageIcon_=()=>null;
+webDedupe.LockService={getScriptLock:()=>({tryLock:()=>true,releaseLock:()=>{}})};
+webDedupe.CacheService={getUserCache:()=>({get:k=>webCache.get(k),remove:k=>webCache.delete(k)})};
+webDedupe.message_=()=>sample;webDedupe.notion_=()=>{createAttempts++;throw Error('Duplicate must never reach page creation');};
+for(const existing of [{Website:`https://www.linkedin.com/jobs/view/engineer-${job}/`},{...a,Website:'https://www.linkedin.com/jobs/view/999/'}]){
+ webCache.set('preview:old-ticket',JSON.stringify({source,ids:[sample.id]}));webDedupe.existing_=()=>[existing];
+ assert(['duplicate','review'].includes(webDedupe.importApplications('old-ticket').results[0].state));
+}
+assert.equal(createAttempts,0);
