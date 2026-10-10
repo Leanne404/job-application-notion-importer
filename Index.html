@@ -109,14 +109,16 @@ function renderWebsites(results){
 $('websitePreview').onclick=async()=>{
   if(working)return;
   if(!$('websiteDate').checkValidity()){websiteError(Error('Enter a valid application date.'));return;}
-  websiteTickets=[];busy(true);const results=[],seen=new Set();let cursor=null;
+  websiteTickets=[];busy(true);const results=[],seen=new Set();let cursor=null,skipped=0;
   try{do{
-    $('websiteMessage').textContent='Reading job websites... Keep this page open.';
+    $('websiteMessage').textContent=cursor?'Reading remaining incomplete rows... Keep this page open.':'Checking Notion for incomplete rows... Completed rows will be skipped.';
     const data=await call('previewWebsiteRows',cursor,$('websiteDate').value||null);results.push(...data.results);renderWebsites(results);
+    if(Number.isFinite(data.skipped))skipped=data.skipped;
+    if(Number.isFinite(data.total))$('websiteMessage').textContent='Checked '+data.checked+' of '+data.total+' incomplete rows. '+data.skipped+' completed or empty-Website rows skipped.';
     if(data.results.some(r=>r.state==='ready'))websiteTickets.push(data.ticket);
     cursor=data.nextCursor;if(cursor&&seen.has(cursor))throw Error('Repeated pagination response. Preview again.');if(cursor)seen.add(cursor);
   }while(cursor);
-  busy(false);$('websiteMessage').textContent=results.filter(r=>r.state==='ready').length+' rows ready. Review the details and confirm within 30 minutes. Duplicates are checked again before writing.';
+  busy(false);$('websiteMessage').textContent=results.filter(r=>r.state==='ready').length+' rows ready; '+skipped+' completed or empty-Website rows skipped. Review the details and confirm within 30 minutes. Duplicates are checked again before writing.';
   }catch(e){websiteError(e);}
 };
 $('websiteFill').onclick=async()=>{

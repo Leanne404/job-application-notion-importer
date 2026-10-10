@@ -115,6 +115,8 @@ It fills whatever it can find: blank **Company, Position, Location, Salary Range
 
 **Supported pages:** public company career pages that include readable `JobPosting` structured data, plus Greenhouse job-board links. It follows public HTTPS redirects after checking each destination. It cannot read every website: login requirements, access blocks, JavaScript-only pages, job lists or pages without a readable job posting are flagged for manual review. Partial job postings can still fill the fields they provide. No guessed company names or posting dates are written.
 
+**Query time:** each new Website preview reads the Notion table once (paginated), then processes only rows with Website and missing core fields. Completed rows never trigger website requests. Later batches reuse a private snapshot for that preview, which expires within 30 minutes. Each confirmed write batch still rereads Notion for current duplicate checks and rechecks its target pages and job details. Starting another preview performs a fresh scan.
+
 **Duplicate checks:** compare normalized URLs (ignore common tracking parameters), known job-board IDs and resolved redirect URLs before preview and again before updates. For identical links, prefer the row with more filled fields, then the oldest row. Other copies are skipped, never deleted. A different link with the same company and position is flagged as a possible duplicate. Different URLs cannot always be identified as the same job automatically.
 
 **Validation:** live read-only checks extracted company, position, location and salary from a Figma Greenhouse posting and a Stripe company-career page. A Spotify Lever page returned 403 and was correctly reported as unreadable. These are examples, not guarantees for every posting; your deployed Apps Script and Notion account still need your own preview check.
@@ -356,6 +358,8 @@ Website 補資料還可使用以下選用欄位，名稱需完全相符：
 **例子：** 網站只有公司、職稱和地點，沒有薪資，就補抓得到的資料，Salary Range 留空。已有值不覆蓋。薪資未註明計薪週期時，文字會標示 `period unspecified`。
 
 **支援範圍：** 含可讀取 `JobPosting` 職缺資料的公司公開招募頁，以及 Greenhouse 職缺連結。網址轉址時會逐一檢查公開 HTTPS 目的地。無法保證所有網站都能讀取：需登入、阻擋存取、僅由 JavaScript 載入的頁面、職缺列表或完全沒有可讀職缺資料，都會標示人工確認；職缺只提供部分資料時，仍可補抓得到的欄位，不猜公司名稱，也不把發布日期當申請日期。
+
+**查詢時間：** 每次新的 Website 預覽只分頁讀取 Notion 全表一次，接著只處理有 Website、必要欄位未填完的列；完成的列不會發出網站請求。後續批次沿用該次預覽的私人暫存，最長約 30 分鐘。確認寫入的每一批仍會重新讀取 Notion 驗重，並再次檢查目標列與職缺資料。重新按預覽會開始一次新的掃描。
 
 **去重方式：** 預覽及更新前，比對整理過的網址（忽略常見追蹤參數）、已支援招募平台的職缺編號及轉址後網址。同一連結優先補已有較多資料的列，再選最早建立的列；其他重複列跳過，不會刪除。不同網址但公司與職稱相同時，標示疑似重複。不同網址不一定能自動認出是同一職缺。
 
