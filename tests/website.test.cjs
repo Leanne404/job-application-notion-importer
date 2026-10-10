@@ -206,3 +206,20 @@ console.log('206-row performance case: one three-page Notion scan, six incomplet
  for(const [key,value] of cache)if(key.startsWith('website-scan:'))assert(Buffer.byteLength(value,'utf8')<100000);
  const result=ctx.websiteSnapshotRead_('chunk-test',source);assert.equal(result[0].properties.Company.title[0].text.content,large.properties.Company.title[0].text.content);
 }
+
+// Employer fallback uses explicit job-description statements, never a platform/domain guess.
+{
+ const parse=(description,organization={name:''})=>c.websiteParse_(html({...posting,hiringOrganization:organization,description}),url).Company;
+ assert.equal(parse('Join our engineering team. ExampleCorp is seeking a Software Engineer to build tools.'),'ExampleCorp');
+ assert.equal(parse('<p>Example Labs is hiring an Engineer.</p>'),'Example Labs');
+ assert.equal(parse('ExampleCorp is currently looking for a developer.'),'ExampleCorp');
+ assert.equal(parse('We are hiring. Experience using Microsoft products is required.'),'');
+ assert.equal(parse('Our Client is seeking a developer.'),'');
+ assert.equal(parse('ExampleCorp is seeking a developer. OtherCorp is hiring an engineer.'),'');
+ assert.equal(parse('ExampleCorp is seeking a developer.',{name:'Explicit Employer'}),'Explicit Employer');
+ assert.equal(parse('Nothing here.','String Employer'),'String Employer');
+ assert.equal(parse('Nothing here.',[{name:'Array Employer'}]),'Array Employer');
+ assert.equal(c.websiteCompany_({description:'<script>ExampleCorp is seeking a developer.</script>'}),'');
+ assert.equal(parse('The company makes recruiting tools.'),'');
+ console.log('Explicit employer description fallback and ambiguous-name safeguards passed.');
+}

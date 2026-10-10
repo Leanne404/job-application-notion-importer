@@ -128,6 +128,20 @@ function websiteSalary_(salary) {
 function websiteDetails_(company,position,url,location,salary) {
   return {Company:websiteValue_(company),Position:websiteValue_(position),Location:websiteValue_(location),'Salary Range':websiteValue_(salary),Website:url,Status:'Applied'};
 }
+// Use explicit employer statements only; do not infer an employer from a host or platform brand.
+function websiteCompany_(job) {
+  const organizations=[].concat(job.hiringOrganization||[]);
+  const names=[...new Set(organizations.map(x=>websiteValue_(typeof x==='string'?x:x&&x.name)).filter(Boolean))];
+  if(names.length)return names.length===1?names[0]:'';
+  const description=websiteText_(String(job.description||'').replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi,' ').replace(/<style\b[^>]*>[\s\S]*?<\/style\s*>/gi,' ').replace(/<\/(?:p|div|li|h[1-6])\s*>|<br\s*\/?>/gi,'\n').replace(/<[^>]*>/g,''));
+  const found=[];
+  for(const match of description.matchAll(/(?:^|[.!?]\s+)([A-Z][A-Za-z0-9&’'(),.\-]*(?:\s+[A-Z0-9][A-Za-z0-9&’'(),.\-]*){0,7})\s+is\s+(?:currently\s+)?(?:seeking|hiring|recruiting|looking for)\s+(?:a|an)\s+/g)) {
+    const name=websiteValue_(match[1]);
+    if(name&&!/^(?:We|Who|This|It|Our|The|A|An|My|Your|Their|He|She|Someone|Everyone|Nobody)(?:\s|$)/i.test(name))found.push(name);
+  }
+  const unique=[...new Set(found)];
+  return unique.length===1?unique[0]:'';
+}
 function websiteParse_(html,url) {
   const jobs=[];
   const visit=(node,depth)=>{
@@ -144,7 +158,7 @@ function websiteParse_(html,url) {
   const candidates=exact.length?exact:jobs;
   if(candidates.length!==1)throw Error('This page has no single readable job posting. Login-only, JavaScript-only, or job-list pages may need manual review.');
   const job=candidates[0];
-  return websiteDetails_(job.hiringOrganization&&job.hiringOrganization.name,job.title,url,websiteLocation_(job),websiteSalary_(job.baseSalary));
+  return websiteDetails_(websiteCompany_(job),job.title,url,websiteLocation_(job),websiteSalary_(job.baseSalary));
 }
 function websiteRead_(value) {
   const u=websiteUrl_(value),match=u.path.match(/^\/([a-z\d_-]+)\/jobs\/(\d+)\/?$/i);
