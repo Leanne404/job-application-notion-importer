@@ -35,7 +35,7 @@ console.log('External structured job pages, URL normalization, redirects, public
 function fixture(){
  const ctx=context(),cache=new Map(),writes=[],page={id:pageId,created_time:'2020-01-01',last_edited_time:'first',parent:{data_source_id:source},properties:{Company:{type:'title',title:[]},Position:{type:'rich_text',rich_text:[]},Website:{type:'rich_text',rich_text:[{text:{content:url}}]},Status:{type:'select',select:null},'Apply Date':{type:'date',date:null}}};
  let pages=[page];
- ctx.checkSchema_=()=>{};ctx.dataSource_=()=>source;ctx.Utilities={getUuid:()=> 'ticket'};
+ let sequence=0;ctx.checkSchema_=()=>{};ctx.dataSource_=()=>source;ctx.Utilities={getUuid:()=> 'ticket-'+(++sequence)};
  ctx.CacheService={getUserCache:()=>({get:k=>cache.get(k),put:(k,v)=>cache.set(k,v),remove:k=>cache.delete(k)})};
  ctx.LockService={getScriptLock:()=>({tryLock:()=>true,releaseLock:()=>{}})};
  ctx.Gmail=new Proxy({},{get(){throw Error('Website workflow must never use Gmail');}});
@@ -89,7 +89,7 @@ for(const change of ['edit','parent','source','details']){
 }
 {
  const {ctx,page,setPages}=fixture();const many=Array.from({length:6},(_,i)=>({...page,id:String(i+2).repeat(32)}));setPages(many);
- assert.equal(ctx.previewWebsiteRows().nextCursor,'5');assert.equal(ctx.previewWebsiteRows('5').nextCursor,null);
+ const first=ctx.previewWebsiteRows();assert(first.nextCursor.endsWith(':5'));assert.equal(ctx.previewWebsiteRows(first.nextCursor).nextCursor,null);
  ctx.notion_=()=>({results:[],has_more:true,next_cursor:'again'});assert.throws(()=>ctx.websitePages_(),/pagination/);
 }
 // Best-effort optional fields: partial pages still produce useful updates.
@@ -171,4 +171,38 @@ for(const selected of ['2020-02-03',null]){
  const {ctx,writes}=fixture(),preview=ctx.previewWebsiteRows(null,'2020-01-01');
  ctx.fillWebsiteRows(preview.ticket,'2020-03-04',selected);
  assert.equal(writes[0].properties['Apply Date'].date.start,selected||'2020-03-04');
+}
+
+// Completed rows never trigger site reads, and all preview batches share one Notion snapshot.
+{
+ const {ctx,page,cache}=fixture();let queries=0,reads=0;
+ const pages=Array.from({length:206},(_,i)=>{
+  const item=JSON.parse(JSON.stringify(page));item.id=String(i).padStart(32,'0');item.properties.Website.rich_text=[{text:{content:'https://careers.example.com/job/'+i}}];
+  if(i<200){item.properties.Company.title=[{text:{content:'Company '+i}}];item.properties.Position.rich_text=[{text:{content:'Role '+i}}];item.properties.Status.select={name:'Applied'};item.properties['Apply Date'].date={start:'2020-01-01'};}
+  return item;
+ });
+ ctx.notion_=(path,method,body)=>{queries++;const offset=Number(body.start_cursor||0);return {results:pages.slice(offset,offset+100),has_more:offset+100<pages.length,next_cursor:String(offset+100)};};
+ ctx.websiteRead_=link=>{reads++;return {Company:'New Company '+reads,Position:'Engineer',Status:'Applied',Website:link,keys:[ctx.websiteKey_(link)]};};
+ const first=ctx.previewWebsiteRows();assert.equal(first.total,6);assert.equal(first.skipped,200);assert.equal(first.checked,5);assert.equal(queries,3);assert.equal(reads,5);
+ const last=ctx.previewWebsiteRows(first.nextCursor);assert.equal(last.checked,6);assert.equal(last.nextCursor,null);assert.equal(queries,3);assert.equal(reads,6);
+ assert(![...cache.keys()].some(k=>k.startsWith('website-scan:')));
+}
+{
+ const {ctx,page,setPages,cache}=fixture();setPages(Array.from({length:6},(_,i)=>({...page,id:String(i+2).repeat(32)})));
+ const first=ctx.previewWebsiteRows(),session=first.nextCursor.split(':')[0];
+ cache.delete('website-scan:'+session+':0');ctx.notion_=()=>{throw Error('Must not silently rescan after cache loss');};
+ assert.throws(()=>ctx.previewWebsiteRows(first.nextCursor),/expired/);
+}
+console.log('206-row performance case: one three-page Notion scan, six incomplete-site reads, and safe cache expiry passed.');
+
+{
+ const {ctx,page,setPages}=fixture();setPages(Array.from({length:6},(_,i)=>({...page,id:String(i+2).repeat(32)})));
+ const first=ctx.previewWebsiteRows();ctx.dataSource_=()=> '9'.repeat(32);
+ assert.throws(()=>ctx.previewWebsiteRows(first.nextCursor),/connection changed/);
+}
+{
+ const {ctx,page,cache}=fixture(),large=JSON.parse(JSON.stringify(page));large.properties.Company.title=[{text:{content:'Example '.repeat(12000)+'🚀'}}];
+ ctx.websiteSnapshotWrite_('chunk-test',source,[large]);
+ for(const [key,value] of cache)if(key.startsWith('website-scan:'))assert(Buffer.byteLength(value,'utf8')<100000);
+ const result=ctx.websiteSnapshotRead_('chunk-test',source);assert.equal(result[0].properties.Company.title[0].text.content,large.properties.Company.title[0].text.content);
 }

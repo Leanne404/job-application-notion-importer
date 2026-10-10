@@ -212,16 +212,51 @@ function websiteProposal_(row,details,date,fields) {
   const reason=(available.length?'Fill: '+available.join(', ')+'. ':'No available values to fill. ')+(unavailable.length?'Not found: '+unavailable.join(', ')+'. ':'')+'Original Website and existing values are kept.';
   return Object.assign({},values,row,...available.map(k=>({[k]:values[k]})),{Website:details.Website,fields:available,state:available.length?'ready':'review',reason});
 }
+// Reuse a private per-preview snapshot instead of rereading Notion for every batch.
+function websiteSnapshotWrite_(session,source,pages) {
+  const compact=pages.map(page=>({id:page.id,created_time:page.created_time,last_edited_time:page.last_edited_time,
+    properties:Object.fromEntries(['Company','Position','Website','Status','Apply Date','Location','Salary Range'].filter(k=>page.properties[k]).map(k=>[k,page.properties[k]]))}));
+  const text=JSON.stringify(compact),cache=CacheService.getUserCache(),prefix='website-scan:'+session+':';
+  const chunks=[];let start=0;
+  while(start<text.length){let end=Math.min(start+20000,text.length);const last=text.charCodeAt(end-1);if(end<text.length&&last>=0xd800&&last<=0xdbff)end--;chunks.push(text.slice(start,end));start=end;}
+  if(chunks.length>200)throw Error('This database is too large for one preview. Use a smaller tracker database.');
+  // Each chunk stays below the cache byte limit, including non-ASCII text.
+  chunks.forEach((chunk,i)=>cache.put(prefix+i,chunk,1800));
+  cache.put(prefix+'meta',JSON.stringify({source,count:chunks.length}),1800);
+}
+function websiteSnapshotRead_(session,source) {
+  const cache=CacheService.getUserCache(),prefix='website-scan:'+session+':',raw=cache.get(prefix+'meta');
+  if(!raw)throw Error('This preview session expired. Preview again.');
+  const meta=JSON.parse(raw);if(meta.source!==source)throw Error('The Notion connection changed. Preview again.');
+  if(!Number.isSafeInteger(meta.count)||meta.count<1||meta.count>200)throw Error('Invalid preview session. Preview again.');
+  const chunks=[];
+  for(let i=0;i<meta.count;i++){const part=cache.get(prefix+i);if(part==null)throw Error('This preview session expired. Preview again.');chunks.push(part);}
+  return JSON.parse(chunks.join(''));
+}
+function websiteSnapshotRemove_(session) {
+  if(!session)return;
+  const cache=CacheService.getUserCache(),prefix='website-scan:'+session+':',raw=cache.get(prefix+'meta');
+  if(raw){const meta=JSON.parse(raw);for(let i=0;i<meta.count;i++)cache.remove(prefix+i);}
+  cache.remove(prefix+'meta');
+}
 function previewWebsiteRows(cursor,date) {
   if(date)websiteDate_(date);
-  const offset=cursor==null?0:Number(cursor);
-  if(!Number.isSafeInteger(offset)||offset<0)throw Error('Invalid preview cursor.');
-  checkSchema_();
-  const source=dataSource_(),pages=websitePages_().sort((a,b)=>a.id.localeCompare(b.id)),results=[],entries=[],resolved=[];
-  for(const page of pages.slice(offset,offset+5)) {
-    const row=websiteRow_(page);if(!norm_(row.Website))continue;
-    const fields=websiteFields_(page);
-    if(websiteComplete_(row))continue;
+  const source=dataSource_();let offset=0,session=null,pages;
+  if(cursor!=null){
+    const match=String(cursor).match(/^([a-z\d-]{1,100}):(\d+)$/i);
+    if(!match)throw Error('Invalid preview cursor. Start a new preview.');
+    session=match[1];offset=Number(match[2]);
+    if(!Number.isSafeInteger(offset)||offset<0)throw Error('Invalid preview cursor.');
+    pages=websiteSnapshotRead_(session,source);
+  }else{
+    checkSchema_();pages=websitePages_().sort((a,b)=>a.id.localeCompare(b.id));
+  }
+  const candidates=pages.filter(page=>{const row=websiteRow_(page);return norm_(row.Website)&&!websiteComplete_(row);});
+  if(offset>candidates.length)throw Error('Invalid preview cursor.');
+  if(!session&&candidates.length>5){session=Utilities.getUuid();websiteSnapshotWrite_(session,source,pages);}
+  const results=[],entries=[],resolved=[];
+  for(const page of candidates.slice(offset,offset+5)) {
+    const row=websiteRow_(page),fields=websiteFields_(page);
     let display=Object.assign({},row,{Website:''});
     try {
       const urls=websiteLinks_(row.Website);
@@ -245,7 +280,9 @@ function previewWebsiteRows(cursor,date) {
   }
   const ticket=Utilities.getUuid();
   CacheService.getUserCache().put('website:'+ticket,JSON.stringify({source,date:date||null,entries}),1800);
-  return {ticket,results,nextCursor:offset+5<pages.length?String(offset+5):null};
+  const nextCursor=offset+5<candidates.length?session+':'+(offset+5):null;
+  if(!nextCursor)websiteSnapshotRemove_(session);
+  return {ticket,results,nextCursor,checked:Math.min(offset+5,candidates.length),total:candidates.length,skipped:pages.length-candidates.length};
 }
 function fillWebsiteRows(ticket,today,selectedDate) {
   websiteDate_(today);
