@@ -108,7 +108,7 @@ The two workflow buttons are **LinkedIn Gmail import** and **Fill from Website**
 3. Optionally choose **Apply Date** for this batch. Leave it blank to use your local date when you confirm.
 4. Click **Preview websites**, check the available company, position, location, salary, date and duplicate results, then **Fill blank fields** within 30 minutes.
 
-It fills whatever it can find: blank **Company, Position, Location, Salary Range**, plus **Apply Date and Status (`Applied`)**. Missing details stay blank; they do not prevent other available fields from being filled. Your supplied **Website link stays intact**, as do existing values, icons and other content. Rows without Website or with all supported target fields filled are skipped. **Location** and **Salary Range** are optional **Text** properties; absent or differently typed properties are not changed. Salary text retains the published currency, range and pay period when provided; no salary or annual conversion is guessed. This workflow does not read Gmail or create new Notion rows.
+It fills whatever it can find: blank **Company, Position, Location, Salary Range**, plus **Apply Date and Status (`Applied`)**. Missing details stay blank; they do not prevent other available fields from being filled. Your supplied **Website link stays intact**, as do existing values, icons and other content. **Rows with Company, Position, Status and Apply Date already filled are skipped entirely**, even if Location or Salary Range is blank. Rows without Website are also skipped. **Location** and **Salary Range** are optional **Text** properties; absent or differently typed properties are not changed. Salary text retains the published currency, range and pay period when provided; no salary or annual conversion is guessed. This workflow does not read Gmail or create new Notion rows.
 
 **Example:** if a page provides a company, title and location but no salary, those available fields can be filled while Salary Range stays blank. Existing values are never overwritten. If the website omits a pay period, the salary text says `period unspecified`.
 
@@ -202,6 +202,7 @@ You may create your own database or obtain [Niko's Job Tracker template](https:/
 | Notion 401 | Reconnect with a valid secret. |
 | Notion 403 / 404 | Check database Connections, workspace, access limits, and the original database link. |
 | Wrong property type | Match the Notion table above. |
+| `Script function not found: previewWebsiteRows` | The deployment is missing the Website backend. Copy the **entire latest SingleFile.gs**, not the repository’s Code.gs alone, into Apps Script Code.gs; save and deploy a **New version** under Manage deployments, then reload. |
 | Expired web preview or changed database | Preview again. |
 | Quota reached / timeout | Wait for quota recovery; for timeouts, use a smaller date range. Preview again to check completed records. |
 | CLI Google login expired | Run `node cli.mjs setup` and reconnect Gmail. |
@@ -223,7 +224,7 @@ You may create your own database or obtain [Niko's Job Tracker template](https:/
 <details>
 <summary>For developers</summary>
 
-Web source: `Code.gs`, `Index.html`. Terminal source: `cli.mjs`, `lib/`. Both reuse the parser in `Code.gs`. After shared/web changes, rebuild the generated `SingleFile.gs`:
+Web source: `Code.gs` (Gmail), `Website.gs` (Website fill), `Index.html` (interface). Terminal source: `cli.mjs`, `lib/`. Both reuse the parser in `Code.gs`. After shared/web changes, rebuild the generated `SingleFile.gs`:
 
 ```sh
 python3 scripts/build-single.py
@@ -348,7 +349,7 @@ Website 補資料還可使用以下選用欄位，名稱需完全相符：
 3. 可指定這批資料的 **Apply Date**；留空就用按下確認時的本地日期。
 4. 按 **Preview websites**，檢查抓到的公司、職稱、地點、薪資、日期和去重結果，再於 30 分鐘內按 **Fill blank fields**。
 
-工具會盡量補抓得到的空白 **Company、Position、Location、Salary Range**，以及 **Apply Date、Status（Applied）**。缺少的資料留空，不會擋住其他抓到的欄位。你貼的 **Website 原始連結會保留**；已有欄位值、圖示和其他內容也保留。沒有 Website 或支援的目標欄位都已填好的列會跳過。**Location、Salary Range** 是選用的**文字 / Text** 欄位；不存在或類型不同時不修改。薪資保留網站提供的幣別、範圍及計薪週期，不猜金額，也不擅自換算年薪。此流程不讀 Gmail，也不新增 Notion 列。
+工具會盡量補抓得到的空白 **Company、Position、Location、Salary Range**，以及 **Apply Date、Status（Applied）**。缺少的資料留空，不會擋住其他抓到的欄位。你貼的 **Website 原始連結會保留**；已有欄位值、圖示和其他內容也保留。**Company、Position、Status、Apply Date 都有值的列會直接跳過**，即使 Location 或 Salary Range 空白，也不會重新抓取或檢查該列。沒有 Website 的列也會跳過。**Location、Salary Range** 是選用的**文字 / Text** 欄位；不存在或類型不同時不修改。薪資保留網站提供的幣別、範圍及計薪週期，不猜金額，也不擅自換算年薪。此流程不讀 Gmail，也不新增 Notion 列。
 
 **例子：** 網站只有公司、職稱和地點，沒有薪資，就補抓得到的資料，Salary Range 留空。已有值不覆蓋。薪資未註明計薪週期時，文字會標示 `period unspecified`。
 
@@ -441,6 +442,7 @@ Website 讀取只向職缺網站（或 Greenhouse 公開 API）請求職缺資�
 | 沒有找到信 | 確認收信帳號、收信日期與支援的信件格式。 |
 | Notion 401 | 用有效密鑰重新連接。 |
 | Notion 403／404 | 檢查資料庫 Connections、工作區、存取限制與原始資料庫連結。 |
+| `Script function not found: previewWebsiteRows` | 部署缺少 Website 後端。把最新 **SingleFile.gs 全部內容**貼進 Apps Script 的 Code.gs（不是只複製儲存庫的 Code.gs），儲存後到「管理部署」部署**新版本**，再重新整理網頁。 |
 | 欄位類型不符 | 依上方 Notion 表格修正。 |
 | 網頁預覽過期或換過資料庫 | 重新預覽。 |
 | 配額用完／超時 | 等待配額恢復；超時可縮小日期範圍。重新預覽核對完成項目。 |
@@ -463,7 +465,7 @@ Website 讀取只向職缺網站（或 Greenhouse 公開 API）請求職缺資�
 <details>
 <summary>開發者說明</summary>
 
-網頁原始碼：`Code.gs`、`Index.html`；終端機原始碼：`cli.mjs`、`lib/`。兩者共用 `Code.gs` 的解析規則。修改共用／網頁程式後，重新產生整合版 `SingleFile.gs`：
+網頁原始碼：`Code.gs`（Gmail）、`Website.gs`（Website 補資料）、`Index.html`（介面）；終端機原始碼：`cli.mjs`、`lib/`。兩者共用 `Code.gs` 的解析規則。修改共用／網頁程式後，重新產生整合版 `SingleFile.gs`：
 
 ```sh
 python3 scripts/build-single.py

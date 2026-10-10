@@ -114,13 +114,38 @@ assert.equal(c.websiteLocation_({jobLocationType:'TELECOMMUTE',applicantLocation
 {
  const {ctx,page,writes}=fixture();page.properties.Company.title=[{text:{content:'Example & Co'}}];page.properties.Position.rich_text=[{text:{content:'Software Engineer'}}];page.properties.Status.select={name:'Applied'};page.properties['Apply Date'].date={start:'2020-01-01'};page.properties.Location={type:'rich_text',rich_text:[]};
  ctx.websiteRead_=()=>({Company:'Example & Co',Position:'Software Engineer',Location:'Remote',Website:url,Status:'Applied',keys:[ctx.websiteKey_(url)]});
- const preview=ctx.previewWebsiteRows();assert.equal(preview.results[0].state,'ready');ctx.fillWebsiteRows(preview.ticket,'2020-01-01');assert.deepEqual(Object.keys(writes[0].properties),['Location']);
+ let reads=0;ctx.websiteRead_=()=>{reads++;throw Error('Completed rows must not be read');};
+ const preview=ctx.previewWebsiteRows();assert.equal(preview.results.length,0);assert.equal(reads,0);assert.equal(writes.length,0);
 }
 {
  const {ctx,page,writes}=fixture();page.properties.Location={type:'rich_text',rich_text:[]};
  const preview=ctx.previewWebsiteRows();ctx.websiteRead_=()=>({Company:'Example & Co',Position:'Software Engineer',Location:'New location after preview',Website:url,Status:'Applied',keys:[ctx.websiteKey_(url)]});
  ctx.fillWebsiteRows(preview.ticket,'2020-01-01');assert(!writes[0].properties.Location,'Only previewed available values may be written');
 }
+// A single Notion page is never its own duplicate, including UUID formatting variants.
+{
+ const {ctx,page,writes,setPages}=fixture();const copy=JSON.parse(JSON.stringify(page));
+ copy.id=page.id.match(/.{8}|.{4}/g).join('-').toUpperCase();setPages([page,copy]);
+ const preview=ctx.previewWebsiteRows();assert.equal(preview.results.length,1);assert.equal(preview.results[0].state,'ready');
+ assert.equal(ctx.websiteDuplicate_(page,[copy],[ctx.websiteKey_(url)],{Company:'Example',Position:'Engineer'}),null);
+ assert.equal(writes.length,0);
+}
+{
+ const {ctx,page}=fixture();let calls=0;
+ ctx.notion_=()=>++calls===1?{results:[page],has_more:true,next_cursor:'next'}:{results:[page],has_more:false};
+ assert.equal(ctx.websitePages_().length,1);assert.equal(calls,2);
+}
+{
+ const {ctx,page,writes}=fixture(),preview=ctx.previewWebsiteRows();
+ page.properties.Company.title=[{text:{content:'Example'}}];page.properties.Position.rich_text=[{text:{content:'Engineer'}}];page.properties.Status.select={name:'Applied'};page.properties['Apply Date'].date={start:'2020-01-01'};
+ ctx.websiteRead_=()=>{throw Error('Completed rows must not be read');};
+ assert.equal(ctx.fillWebsiteRows(preview.ticket,'2020-01-01').results[0].state,'complete');assert.equal(writes.length,0);
+}
+{
+ const packed={};vm.createContext(packed);vm.runInContext(fs.readFileSync('SingleFile.gs','utf8'),packed);
+ for(const name of ['previewApplications','importApplications','previewWebsiteRows','fillWebsiteRows'])assert.equal(typeof packed[name],'function',name+' missing from deployment bundle');
+}
+console.log('Completed core fields skip optional work, self-matches are excluded, pages are unique and packaged endpoints exist.');
 console.log('Partial extraction, locations, salary units, existing values, optional property types and approved-field writes passed.');
 console.log('No Gmail calls, read-only previews, update-only writes, existing values, dates, duplicates, stale rows and pagination passed.');
 (async()=>{
@@ -136,6 +161,7 @@ console.log('No Gmail calls, read-only previews, update-only writes, existing va
  get('gmailMode').onclick();await get('preview').onclick();assert.equal(gmailReads,1);assert.equal(get('import').disabled,false);
  get('websiteMode').onclick();await get('websitePreview').onclick();get('websiteDate').onchange();assert.equal(get('websiteFill').disabled,true);assert.equal(get('import').disabled,false);
  rpc.previewWebsiteRows=()=>{throw Error('Website blocked');};await get('websitePreview').onclick();assert.equal(get('websitePreview').disabled,false);assert.equal(get('import').disabled,false);
+ rpc.previewWebsiteRows=()=>{throw Error('Script function not found: previewWebsiteRows');};await get('websitePreview').onclick();assert.match(get('websiteMessage').textContent,/SingleFile.gs/);assert.match(get('websiteMessage').textContent,/New version/);
  assert(!/\p{Script=Han}/u.test(markup));
  console.log('Two workflow buttons, separate RPCs/results, preview invalidation and English UI passed.');
 })().catch(e=>{console.error(e);process.exitCode=1;});
