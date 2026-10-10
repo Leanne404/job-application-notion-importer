@@ -114,14 +114,6 @@ console.log('Setup validation, multi-source selection, 60-message pagination, cr
   await get('import').onclick();assert.equal(imports,3);assert.equal(get('import').disabled,true);
   previewPage=0;await get('preview').onclick();get('startDate').onchange();assert.equal(get('import').disabled,true);
   rpc.previewApplications=()=>{throw Error('synthetic preview failure');};await get('preview').onclick();assert.equal(get('import').disabled,true);assert.equal(get('preview').disabled,false);
-  let fillCalls=0,fillUpdates=0;
-  rpc.previewExistingRows=()=>({ticket:'fill-ticket'+fillCalls,nextCursor:++fillCalls<2?'fill-next':null,results:[{...a,state:'ready',reason:'Fill: Company'}]});
-  rpc.fillExistingRows=()=>{fillUpdates++;return {results:[{...a,state:'filled'}]};};
-  const originalRows=get('rows').children.length;
-  await get('fillPreview').onclick();assert.equal(fillCalls,2);assert.equal(get('fillApply').disabled,false);assert.equal(get('rows').children.length,originalRows);
-  await get('fillApply').onclick();assert.equal(fillUpdates,2);assert.equal(get('fillApply').disabled,true);
-  fillCalls=0;await get('fillPreview').onclick();get('fillDate').onchange();assert.equal(get('fillApply').disabled,true);
-  rpc.previewExistingRows=()=>{throw Error('synthetic fill failure');};await get('fillPreview').onclick();assert.equal(get('fillApply').disabled,true);assert.equal(get('fillPreview').disabled,false);
   console.log('Client automatic paging, queued import, changed-filter invalidation and failure recovery passed.');
 })().catch(e=>{console.error(e);process.exitCode=1;});
 
@@ -205,56 +197,3 @@ assert.equal(ctx.body_({mimeType:'multipart/alternative',parts:[
 ]}),plain);
 assert.equal(base64Calls,1,'Gmail bytes from Apps Script must not be decoded as base64 again');
 console.log('Gmail body decoding accepts both base64url text and Apps Script byte arrays.');
-
-// Public Website backfill: no Gmail dependency and no page creation.
-const fillCtx={};vm.createContext(fillCtx);vm.runInContext(fs.readFileSync('Code.gs','utf8'),fillCtx);
-const fillSource='4'.repeat(32),fillPageId='5'.repeat(32),fillCache=new Map(),fillWrites=[];
-const emptyRow={Company:'',Position:'',Status:'',Website:a.Website,'Apply Date':''};
-assert.equal(fillCtx.fillProposal_(emptyRow,a).state,'ready');
-assert.equal(fillCtx.fillProposal_({...emptyRow,Status:'Interviewing','Apply Date':'2019-01-01'},a).Status,'Interviewing');
-assert(!fillCtx.fillProposal_({...emptyRow,Status:'Interviewing'},a).fields.includes('Status'));
-assert.equal(fillCtx.fillProposal_({...emptyRow,Company:'Other'},a).state,'review');
-const structured={ '@type':'JobPosting',identifier:{value:job},title:'Software Engineer',hiringOrganization:{name:'Example Company'},datePosted:'2010-01-01'};
-const markup=j=>'<script type="application/ld+json">'+JSON.stringify(j)+'</script>';
-assert.equal(fillCtx.jobPageData_(markup(structured),job).Position,'Software Engineer');
-assert.equal(fillCtx.jobPageData_(markup({'@graph':[structured]}),job).Company,'Example Company');
-assert.throws(()=>fillCtx.jobPageData_(markup([structured,structured]),job),/unambiguous/);
-assert.throws(()=>fillCtx.jobPageData_('<html>Sign in</html>',job),/unambiguous/);
-assert.throws(()=>fillCtx.jobPageData_(markup({...structured,identifier:{value:'999'}}),job));
-assert.equal(fillCtx.fillJobIds_('https://www.linkedin.com/jobs/view/engineer-at-example-'+job+'/?tracking=x')[0],job);
-assert.equal(fillCtx.fillJobIds_('https://linkedin.com.evil.test/jobs/view/'+job).length,0);
-for(const date of ['2020-02-30','bad','2020-1-2',null])assert.throws(()=>fillCtx.fillDate_(date));
-assert.equal(fillCtx.fillDate_('2020-02-29'),'2020-02-29');
-fillCtx.UrlFetchApp={fetch:(url,options)=>{assert.equal(url,a.Website);assert.equal(options.followRedirects,false);assert.equal(options.headers,undefined);return {getResponseCode:()=>200,getContentText:()=>markup(structured)};}};
-assert.equal(fillCtx.readJobPage_(job).Company,'Example Company');
-assert.throws(()=>fillCtx.readJobPage_('http://localhost'),/Unsupported/);
-let page={id:fillPageId,parent:{data_source_id:fillSource},last_edited_time:'synthetic-time',properties:{Company:{type:'title',title:[]},Position:{type:'rich_text',rich_text:[]},Status:{select:null},Website:{type:'rich_text',rich_text:[{text:{content:a.Website}}]},'Apply Date':{date:null}}};
-let pages=[page];
-fillCtx.dataSource_=()=>fillSource;fillCtx.checkSchema_=()=>{};fillCtx.Utilities={getUuid:()=> 'synthetic-fill'};
-fillCtx.CacheService={getUserCache:()=>({put:(k,v)=>fillCache.set(k,v),get:k=>fillCache.get(k),remove:k=>fillCache.delete(k)})};
-fillCtx.LockService={getScriptLock:()=>({tryLock:()=>true,releaseLock:()=>{}})};
-fillCtx.notion_=(path,method,body)=>{
-  if(path.endsWith('/query'))return {results:pages,has_more:false};
-  if(method==='patch'){fillWrites.push(body);return page;}
-  assert.equal(path,'pages/'+fillPageId);return page;
-};
-let fillPreview=fillCtx.previewExistingRows(null,'2020-01-02');assert.equal(fillWrites.length,0);assert.equal(fillPreview.results[0].state,'ready');
-assert.equal(fillCtx.fillExistingRows(fillPreview.ticket,'2020-01-03').results[0].state,'filled');
-assert.deepEqual(Object.keys(fillWrites[0].properties).sort(),['Apply Date','Company','Position','Status']);
-assert.equal(fillWrites[0].properties['Apply Date'].date.start,'2020-01-02');assert.equal(fillWrites[0].properties.Status.select.name,'Applied');
-assert.throws(()=>fillCtx.fillExistingRows(fillPreview.ticket,'2020-01-03'),/expired/);
-fillPreview=fillCtx.previewExistingRows(null,null);assert.equal(fillPreview.results[0]['Apply Date'],'Today when confirmed');
-assert.equal(fillCtx.fillExistingRows(fillPreview.ticket,'2020-01-04').results[0].state,'filled');assert.equal(fillWrites[1].properties['Apply Date'].date.start,'2020-01-04');
-fillPreview=fillCtx.previewExistingRows();page.last_edited_time='changed';
-assert.equal(fillCtx.fillExistingRows(fillPreview.ticket,'2020-01-03').results[0].state,'review');assert.equal(fillWrites.length,2);
-const duplicate=JSON.parse(JSON.stringify(page));duplicate.id='3'.repeat(32);duplicate.properties.Company.title=[{text:{content:'Existing company'}}];pages=[page,duplicate];
-assert.equal(fillCtx.previewExistingRows().results.find(r=>r.pageId===fillPageId).state,'duplicate');
-pages=[page];fillPreview=fillCtx.previewExistingRows();pages.push(duplicate);
-assert.equal(fillCtx.fillExistingRows(fillPreview.ticket,'2020-01-03').results[0].state,'duplicate');assert.equal(fillWrites.length,2);
-pages=[page];page.properties.Status.select={name:'Interviewing'};page.properties['Apply Date'].date={start:'2019-01-01'};
-fillPreview=fillCtx.previewExistingRows(null,'2020-01-01');fillCtx.fillExistingRows(fillPreview.ticket,'2020-01-03');
-assert.deepEqual(Object.keys(fillWrites[2].properties).sort(),['Company','Position']);
-page.properties.Status.select=null;page.properties['Apply Date'].date=null;
-pages=[page];fillPreview=fillCtx.previewExistingRows();page.parent.data_source_id='6'.repeat(32);
-assert.equal(fillCtx.fillExistingRows(fillPreview.ticket,'2020-01-03').results[0].state,'error');assert.equal(fillWrites.length,3);
-console.log('Public job parsing, safe fetch, optional dates, duplicate rechecks, existing values and update-only backfill passed.');

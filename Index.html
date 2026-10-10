@@ -1,15 +1,17 @@
 <!DOCTYPE html><html lang="en"><head><base target="_top"><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
 *{box-sizing:border-box}body{margin:0;background:#f4f5f7;color:#182532;font:15px/1.6 system-ui,sans-serif}main{max-width:1120px;margin:64px auto;padding:0 24px}.eyebrow{color:#476b65;letter-spacing:.13em;font-size:12px;font-weight:700}h1{font-size:34px;letter-spacing:-.04em;margin:8px 0}p{color:#617080}.panel{background:white;border:1px solid #dfe5e8;border-radius:18px;padding:24px;margin-top:24px}.toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap}button,select,input{font:inherit;border-radius:9px;padding:10px 16px;border:1px solid #d8dfe3}button{cursor:pointer;background:#215d50;color:white;border-color:#215d50}button.secondary{background:white;color:#215d50}button:disabled{opacity:.45;cursor:default}#message{margin-top:18px;white-space:pre-wrap}.table{overflow:auto}table{border-collapse:collapse;width:100%;font-size:14px}th,td{text-align:left;padding:14px 10px;border-bottom:1px solid #e9edef;vertical-align:top}th{color:#687787;font-size:12px}td:nth-child(2){min-width:230px}a{color:#236d96}.badge{display:inline-block;white-space:nowrap;padding:3px 9px;border-radius:6px;background:#edf3f1}.review,.error{background:#fff1d9}.duplicate{background:#eef0f3}.muted{color:#76828d;font-size:13px}#empty{padding:42px 12px;text-align:center;color:#82908d}@media(max-width:600px){main{margin:24px auto}h1{font-size:27px}.panel{padding:16px}}
-</style></head><body><main><div class="eyebrow">GMAIL → NOTION</div><h1>Job Application Notion Importer</h1><p>Turn LinkedIn application confirmation emails into records in your Notion job tracker.</p>
+</style></head><body><main><div class="eyebrow">GMAIL → NOTION</div><h1>Job Application Notion Importer</h1><p>Import LinkedIn confirmation emails, or fill Notion rows from external job websites.</p>
 <details class="panel" id="setup"><summary>Set up or change Notion connection</summary><p>Create a Notion connection, grant it access to your database, then enter the details below. See the README for setup instructions.</p><div class="toolbar"><label for="secret">Notion connection secret</label><input id="secret" type="password" autocomplete="off"><label for="databaseLink">Database link</label><input id="databaseLink" type="url" placeholder="Paste the original database link"><select id="source" aria-label="Data source" hidden></select><button id="save">Connect Notion</button></div><p id="setupStatus" role="status"></p></details>
+<nav class="toolbar" style="margin-top:24px" aria-label="Choose a workflow"><button id="gmailMode" aria-pressed="true">LinkedIn Gmail import</button><button id="websiteMode" class="secondary" aria-pressed="false">Fill from Website</button></nav>
+<section id="gmailPanel">
 <div class="panel"><div class="toolbar" style="margin-bottom:16px"><label for="startDate">Start date</label><input type="date" id="startDate" min="1970-01-01" max="9998-12-31"><label for="endDate">End date</label><input type="date" id="endDate" min="1970-01-01" max="9998-12-31"></div><p class="muted" id="dateHint"></p><div class="toolbar"><button id="preview">Check and preview</button><button class="secondary" id="import" disabled>Import new applications</button></div><div id="message" role="status" aria-live="polite">Choose dates, preview the results, then import.</div><p class="muted">Only missing applications are added. Matching jobs are skipped; possible duplicates are flagged for review. Existing application statuses are preserved.</p></div>
 <div class="panel table"><div id="empty">Preview companies, positions, application dates, and duplicate checks here.</div><table id="table" hidden><thead><tr><th>Company</th><th>Position</th><th>Status</th><th>Website</th><th>Apply Date</th><th>Check result</th></tr></thead><tbody id="rows"></tbody></table></div>
-<section class="panel"><h2>Fill existing rows</h2><p>Find rows with a LinkedIn job link in Website and fill blank Company, Position, Apply Date, and Status fields by reading the public LinkedIn job page. Existing values are preserved. Duplicate jobs are skipped. Unavailable or conflicting job pages need manual review.</p><div class="toolbar"><label for="fillDate">Apply Date (optional)</label><input id="fillDate" type="date" min="1970-01-01" max="9998-12-31"><button id="fillPreview">Preview missing details</button><button id="fillApply" class="secondary" disabled>Fill blank fields</button></div><p id="fillMessage" role="status" aria-live="polite">Leave Apply Date blank to use your local date when you click Fill blank fields. Notion Update content permission is required.</p><div class="table"><p id="fillEmpty" class="muted">Rows needing details will appear here.</p><table id="fillTable" hidden><thead><tr><th>Company</th><th>Position</th><th>Status</th><th>Website</th><th>Apply Date</th><th>Check result</th></tr></thead><tbody id="fillRows"></tbody></table></div></section>
-<p class="muted">Supports English and Traditional Chinese LinkedIn application confirmations. Matching emails with unsupported layouts are flagged for manual review.</p></main>
+<p class="muted">Supports English and Traditional Chinese LinkedIn application confirmations. Matching emails with unsupported layouts are flagged for manual review.</p></section>
+<section id="websitePanel" hidden><div class="panel"><h2>Fill from Website</h2><p>Paste an external job link into the Website column of your Notion table, one job per row. This tool reads the job website and fills blank Company, Position, Status (Applied), and Apply Date fields. Your original Website link and existing values are kept.</p><p class="muted">Supports public job pages with readable job details and Greenhouse job boards. Pages requiring login or unsupported layouts are flagged for review. This workflow does not read Gmail.</p><div class="toolbar"><label for="websiteDate">Apply Date (optional)</label><input id="websiteDate" type="date" min="1970-01-01" max="9998-12-31"><button id="websitePreview">Preview websites</button><button id="websiteFill" class="secondary" disabled>Fill blank fields</button></div><p class="muted">Leave the date blank to use your local date when you click Fill blank fields. Enable Update content for your Notion connection. Duplicate rows are skipped, not deleted.</p><p id="websiteMessage" role="status" aria-live="polite">Preview first, review the results, then fill blank fields.</p></div><div class="panel table"><p id="websiteEmpty" class="muted">Website results will appear here.</p><table id="websiteTable" hidden><thead><tr><th>Company</th><th>Position</th><th>Status</th><th>Website</th><th>Apply Date</th><th>Result</th></tr></thead><tbody id="websiteRows"></tbody></table></div></section></main>
 <script>
-let fillTickets=[], tickets=[], working=false;const $=id=>document.getElementById(id);const labels={new:'Ready to import',duplicate:'Already exists',review:'Needs review',created:'Created',error:'Incomplete',ready:'Ready to fill',complete:'Already complete',filled:'Updated'};
-function busy(v){working=v;for(const id of ['preview','startDate','endDate','save','secret','databaseLink','source','fillPreview','fillDate']) $(id).disabled=v;$('import').disabled=v||!tickets.length;$('fillApply').disabled=v||!fillTickets.length;}
+let websiteTickets=[], tickets=[], working=false;const $=id=>document.getElementById(id);const labels={new:'Ready to import',duplicate:'Already exists',review:'Needs review',created:'Created',error:'Incomplete'};
+function busy(v){working=v;for(const id of ['preview','startDate','endDate','save','secret','databaseLink','source','gmailMode','websiteMode','websiteDate','websitePreview']) $(id).disabled=v;$('import').disabled=v||!tickets.length;$('websiteFill').disabled=v||!websiteTickets.length;}
 function errorMessage(e){
   const message=String(e && e.message || e || '');
   return !message || /[^\x00-\x7F]/.test(message)
@@ -17,8 +19,8 @@ function errorMessage(e){
     : message;
 }
 function error(e){tickets=[];busy(false);$('message').textContent=errorMessage(e);}
-function render(data,prefix){const id=name=>prefix?'fill'+name[0].toUpperCase()+name.slice(1):name;$(id('rows')).replaceChildren();$(id('table')).hidden=!data.results.length;$(id('empty')).hidden=!!data.results.length;
-for(const r of data.results){const tr=document.createElement('tr');for(const key of ['Company','Position','Status','Website','Apply Date']){const td=document.createElement('td');if(key==='Website'&&r[key]){const a=document.createElement('a');a.href=r[key];a.textContent='LinkedIn job';a.target='_blank';a.rel='noopener noreferrer';td.append(a);}else td.textContent=r[key]||'—';tr.append(td);}const td=document.createElement('td'),badge=document.createElement('span');badge.className='badge '+r.state;badge.textContent=labels[r.state]||r.state;td.append(badge);const note=document.createElement('div');note.className='muted';note.textContent=r.reason?errorMessage(r.reason):'';td.append(note);tr.append(td);$(id('rows')).append(tr);}}
+function render(data){$('rows').replaceChildren();$('table').hidden=!data.results.length;$('empty').hidden=!!data.results.length;
+for(const r of data.results){const tr=document.createElement('tr');for(const key of ['Company','Position','Status','Website','Apply Date']){const td=document.createElement('td');if(key==='Website'&&r[key]){const a=document.createElement('a');a.href=r[key];a.textContent='LinkedIn job';a.target='_blank';a.rel='noopener noreferrer';td.append(a);}else td.textContent=r[key]||'—';tr.append(td);}const td=document.createElement('td'),badge=document.createElement('span');badge.className='badge '+r.state;badge.textContent=labels[r.state]||r.state;td.append(badge);const note=document.createElement('div');note.className='muted';note.textContent=r.reason?errorMessage(r.reason):'';td.append(note);tr.append(td);$('rows').append(tr);}}
 function dateRange(){
   const start=$('startDate'),end=$('endDate');
   if(!start.checkValidity()||!end.checkValidity()) throw Error('Enter valid dates.');
@@ -64,41 +66,61 @@ $('import').onclick=async()=>{
 for(const id of ['secret','databaseLink']) $(id).oninput=()=>{$('source').replaceChildren();$('source').hidden=true;};
 $('save').onclick=async()=>{
   if(working)return;
-  tickets=[];fillTickets=[];busy(true);$('setupStatus').textContent='Checking the Notion connection...';
+  tickets=[];resetWebsite();busy(true);$('setupStatus').textContent='Checking the Notion connection...';
   try {
     const data=await call('saveConnection',$('secret').value,$('databaseLink').value,$('source').value||null);
     if(data.sources){$('source').replaceChildren();for(const item of data.sources){const option=document.createElement('option');option.value=item.id;option.textContent=item.name;$('source').append(option);}$('source').hidden=false;$('setupStatus').textContent='Select a data source, then click Connect Notion.';}
-    else {$('secret').value='';$('databaseLink').value='';$('setupStatus').textContent='Connected. Settings are saved in your private project.';$('setup').open=false;resetPreview();resetFill();}
+    else {$('secret').value='';$('databaseLink').value='';$('setupStatus').textContent='Connected. Settings are saved in your private project.';$('setup').open=false;resetPreview();}
   }catch(e){$('setupStatus').textContent=errorMessage(e);}
   finally{busy(false);}
 };
 
-function resetFill(){fillTickets=[];$('fillRows').replaceChildren();$('fillTable').hidden=true;$('fillEmpty').hidden=false;$('fillMessage').textContent='Preview first, then confirm the updates.';}
-function fillError(e){fillTickets=[];busy(false);$('fillMessage').textContent=errorMessage(e);}
-$('fillDate').onchange=()=>{resetFill();busy(false);};
-$('fillPreview').onclick=async()=>{
+// Website controls and results are independent of the Gmail workflow above.
+function chooseWorkflow(website){
   if(working)return;
-  if(!$('fillDate').checkValidity()){fillError(Error('Enter a valid application date.'));return;}
-  fillTickets=[];busy(true);const results=[],seen=new Set();let cursor=null;
+  $('gmailPanel').hidden=website;$('websitePanel').hidden=!website;
+  $('gmailMode').setAttribute('aria-pressed',String(!website));$('websiteMode').setAttribute('aria-pressed',String(website));
+  $('gmailMode').className=website?'secondary':'';$('websiteMode').className=website?'':'secondary';
+}
+$('gmailMode').onclick=()=>chooseWorkflow(false);$('websiteMode').onclick=()=>chooseWorkflow(true);
+function resetWebsite(){websiteTickets=[];$('websiteRows').replaceChildren();$('websiteTable').hidden=true;$('websiteEmpty').hidden=false;$('websiteMessage').textContent='Preview again before filling blank fields.';}
+$('websiteDate').onchange=()=>{resetWebsite();busy(false);};
+function websiteError(e){websiteTickets=[];busy(false);$('websiteMessage').textContent=errorMessage(e);}
+function renderWebsites(results){
+  $('websiteRows').replaceChildren();$('websiteTable').hidden=!results.length;$('websiteEmpty').hidden=!!results.length;
+  for(const row of results){const tr=document.createElement('tr');
+    for(const field of ['Company','Position','Status','Website','Apply Date']){
+      const td=document.createElement('td');
+      if(field==='Website'&&/^https:\/\//i.test(row[field]||'')){const link=document.createElement('a');link.href=row[field];link.textContent='Job website';link.target='_blank';link.rel='noopener noreferrer';td.append(link);}else td.textContent=row[field]||'—';
+      tr.append(td);
+    }
+    const td=document.createElement('td'),badge=document.createElement('span');badge.className='badge '+row.state;badge.textContent=({ready:'Ready to fill',filled:'Updated',duplicate:'Duplicate',review:'Needs review',complete:'Already complete',error:'Incomplete'})[row.state]||row.state;td.append(badge);
+    const note=document.createElement('div');note.className='muted';note.textContent=errorMessage(row.reason);td.append(note);tr.append(td);$('websiteRows').append(tr);
+  }
+}
+$('websitePreview').onclick=async()=>{
+  if(working)return;
+  if(!$('websiteDate').checkValidity()){websiteError(Error('Enter a valid application date.'));return;}
+  websiteTickets=[];busy(true);const results=[],seen=new Set();let cursor=null;
   try{do{
-    $('fillMessage').textContent='Checking existing rows... Keep this page open.';
-    const data=await call('previewExistingRows',cursor,$('fillDate').value||null);results.push(...data.results);render({results},'fill');
-    if(data.results.some(r=>r.state==='ready'))fillTickets.push(data.ticket);
+    $('websiteMessage').textContent='Reading job websites... Keep this page open.';
+    const data=await call('previewWebsiteRows',cursor,$('websiteDate').value||null);results.push(...data.results);renderWebsites(results);
+    if(data.results.some(r=>r.state==='ready'))websiteTickets.push(data.ticket);
     cursor=data.nextCursor;if(cursor&&seen.has(cursor))throw Error('Repeated pagination response. Preview again.');if(cursor)seen.add(cursor);
   }while(cursor);
-  busy(false);$('fillMessage').textContent=results.filter(r=>r.state==='ready').length+' rows ready to update. Confirm within 30 minutes. Rows needing review will be skipped.';
-  }catch(e){fillError(e);}
+  busy(false);$('websiteMessage').textContent=results.filter(r=>r.state==='ready').length+' rows ready. Review the details and confirm within 30 minutes. Duplicates are checked again before writing.';
+  }catch(e){websiteError(e);}
 };
-$('fillApply').onclick=async()=>{
-  if(working||!fillTickets.length)return;
+$('websiteFill').onclick=async()=>{
+  if(working||!websiteTickets.length)return;
   const now=new Date(),today=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
-  const queue=fillTickets.slice();fillTickets=[];busy(true);const results=[];
+  const queue=websiteTickets.slice();websiteTickets=[];busy(true);const results=[];
   try{for(const ticket of queue){
-    $('fillMessage').textContent='Filling blank fields... Keep this page open.';
-    const data=await call('fillExistingRows',ticket,today);results.push(...data.results);render({results},'fill');
-    if(data.results.some(r=>r.state==='error'))throw Error('Updates stopped. Review the results and preview again to check completed rows.');
-  }busy(false);$('fillMessage').textContent='Done: '+results.filter(r=>r.state==='filled').length+' existing rows updated.';
-  }catch(e){fillError(e);}
+    $('websiteMessage').textContent='Filling blank fields... Keep this page open.';
+    const data=await call('fillWebsiteRows',ticket,today);results.push(...data.results);renderWebsites(results);
+    if(data.results.some(r=>r.state==='error'))throw Error('Updates stopped. Review the results, then preview again to check completed rows.');
+  }busy(false);$('websiteMessage').textContent='Done: '+results.filter(r=>r.state==='filled').length+' rows updated. Duplicates and rows needing review were skipped.';
+  }catch(e){websiteError(e);}
 };
 call('connectionStatus').then(data=>{$('setup').open=!data.ready;$('setupStatus').textContent=data.ready?'Notion connection configured.':'Notion is not connected. Complete setup first.';}).catch(error);
 </script></body></html>
