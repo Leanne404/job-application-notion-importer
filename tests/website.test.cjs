@@ -236,3 +236,16 @@ console.log('206-row performance case: one three-page Notion scan, six incomplet
  assert.equal(ctx.previewWebsiteRows().results[0].state,'review');
  console.log('Fragmented Notion links, hidden targets, and visible invalid input passed.');
 }
+
+{
+ const {ctx,page}=fixture();
+ // A link label can look like a URL but differ from its actual target.
+ page.properties.Website.rich_text=[{plain_text:url+'?ref=Displayed',href:url}];
+ assert.equal(ctx.previewWebsiteRows().results[0].state,'ready');
+ assert.equal(ctx.websiteRow_(page).Website,url);
+ page.properties.Website.rich_text=[{plain_text:'Job',href:url},{plain_text:' https://careers.example.com/second'}];
+ assert.equal(ctx.previewWebsiteRows().results[0].state,'review');
+ page.properties.Website.rich_text=[{plain_text:'First',href:url},{plain_text:'Second',href:'https://careers.example.com/second'}];
+ assert.equal(ctx.previewWebsiteRows().results[0].state,'review');
+ console.log('URL-looking link labels do not count as extra links; real multiple links still require review.');
+}
