@@ -114,6 +114,13 @@ console.log('Setup validation, multi-source selection, 60-message pagination, cr
   await get('import').onclick();assert.equal(imports,3);assert.equal(get('import').disabled,true);
   previewPage=0;await get('preview').onclick();get('startDate').onchange();assert.equal(get('import').disabled,true);
   rpc.previewApplications=()=>{throw Error('synthetic preview failure');};await get('preview').onclick();assert.equal(get('import').disabled,true);assert.equal(get('preview').disabled,false);
+  let fillCalls=0,fillUpdates=0;
+  rpc.previewExistingRows=()=>({ticket:'fill-ticket'+fillCalls,nextCursor:++fillCalls<2?'fill-next':null,results:[{...a,state:'ready',reason:'Fill: Company'}]});
+  rpc.fillExistingRows=()=>{fillUpdates++;return {results:[{...a,state:'filled'}]};};
+  const originalRows=get('rows').children.length;
+  await get('fillPreview').onclick();assert.equal(fillCalls,2);assert.equal(get('fillApply').disabled,false);assert.equal(get('rows').children.length,originalRows);
+  await get('fillApply').onclick();assert.equal(fillUpdates,2);assert.equal(get('fillApply').disabled,true);
+  rpc.previewExistingRows=()=>{throw Error('synthetic fill failure');};await get('fillPreview').onclick();assert.equal(get('fillApply').disabled,true);assert.equal(get('fillPreview').disabled,false);
   console.log('Client automatic paging, queued import, changed-filter invalidation and failure recovery passed.');
 })().catch(e=>{console.error(e);process.exitCode=1;});
 
@@ -197,3 +204,41 @@ assert.equal(ctx.body_({mimeType:'multipart/alternative',parts:[
 ]}),plain);
 assert.equal(base64Calls,1,'Gmail bytes from Apps Script must not be decoded as base64 again');
 console.log('Gmail body decoding accepts both base64url text and Apps Script byte arrays.');
+
+// Website-only backfill uses existing pages, never creation or job posting dates.
+const fillCtx={};vm.createContext(fillCtx);vm.runInContext(fs.readFileSync('Code.gs','utf8'),fillCtx);
+const fillSource='4'.repeat(32),fillPageId='5'.repeat(32),fillCache=new Map(),fillWrites=[];
+const emptyRow={Company:'',Position:'',Status:'',Website:a.Website,'Apply Date':''};
+assert.equal(fillCtx.fillProposal_(emptyRow,a).state,'ready');
+assert.equal(fillCtx.fillProposal_({...emptyRow,Status:'Interviewing'},a).Status,'Interviewing');
+assert(!fillCtx.fillProposal_({...emptyRow,Status:'Interviewing'},a).fields.includes('Status'));
+assert.equal(fillCtx.fillProposal_({...emptyRow,Company:'Other'},a).state,'review');
+let page={id:fillPageId,parent:{data_source_id:fillSource},last_edited_time:'synthetic-time',properties:{Company:{type:'title',title:[]},Position:{type:'rich_text',rich_text:[]},Status:{select:null},Website:{type:'rich_text',rich_text:[{text:{content:a.Website}}]},'Apply Date':{date:null}}};
+fillCtx.dataSource_=()=>fillSource;fillCtx.checkSchema_=()=>{};
+fillCtx.Utilities={getUuid:()=> 'synthetic-fill'};
+fillCtx.CacheService={getUserCache:()=>({put:(k,v)=>fillCache.set(k,v),get:k=>fillCache.get(k),remove:k=>fillCache.delete(k)})};
+fillCtx.LockService={getScriptLock:()=>({tryLock:()=>true,releaseLock:()=>{}})};
+fillCtx.message_=()=>sample;
+fillCtx.Gmail={Users:{Messages:{list:()=>({messages:[{id:sample.id}]})}}};
+fillCtx.notion_=(path,method,body)=>{
+  if(path.endsWith('/query'))return {results:[page],has_more:true,next_cursor:'synthetic-next'};
+  if(method==='patch'){fillWrites.push(body);return page;}
+  assert.equal(path,'pages/'+fillPageId);return page;
+};
+let fillPreview=fillCtx.previewExistingRows();assert.equal(fillPreview.nextCursor,'synthetic-next');assert.equal(fillWrites.length,0);
+assert.equal(fillPreview.results[0].state,'ready');
+assert.equal(fillCtx.fillExistingRows(fillPreview.ticket).results[0].state,'filled');
+assert.deepEqual(Object.keys(fillWrites[0].properties).sort(),['Apply Date','Company','Position','Status']);
+assert.equal(fillWrites[0].properties.Status.select.name,'Applied');
+assert.throws(()=>fillCtx.fillExistingRows(fillPreview.ticket),/expired/);
+fillPreview=fillCtx.previewExistingRows();page.last_edited_time='changed';
+assert.equal(fillCtx.fillExistingRows(fillPreview.ticket).results[0].state,'review');assert.equal(fillWrites.length,1);
+fillPreview=fillCtx.previewExistingRows();page.parent.data_source_id='6'.repeat(32);
+assert.equal(fillCtx.fillExistingRows(fillPreview.ticket).results[0].state,'error');assert.equal(fillWrites.length,1);
+fillCtx.Gmail.Users.Messages.list=()=>({messages:[]});assert.throws(()=>fillCtx.fillMatch_(job),/No supported/);
+fillCtx.Gmail.Users.Messages.list=()=>({messages:[],nextPageToken:'more'});assert.throws(()=>fillCtx.fillMatch_(job),/Too many/);
+fillCtx.Gmail.Users.Messages.list=()=>({messages:[{id:'one'},{id:'two'}]});
+fillCtx.message_=id=>({...sample,body:id==='two'?sample.body.replace('2020年1月2日','2020年1月3日'):sample.body});
+assert.throws(()=>fillCtx.fillMatch_(job),/disagree/);
+fillCtx.message_=()=>sample;assert.throws(()=>fillCtx.fillMatch_('999'),/No supported/);
+console.log('Backfill preview, exact-job matching, conflicts, preservation, stale tickets, changed rows and update-only fillWrites passed.');

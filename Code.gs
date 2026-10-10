@@ -251,3 +251,96 @@ function importApplications(ticket) {
     return {results};
   } finally {lock.releaseLock();}
 }
+
+// Independent backfill workflow: update existing rows, using confirmation emails only.
+function fillRow_(page) {
+  const p=page.properties;
+  return {pageId:page.id,Company:text_(p.Company),Position:text_(p.Position),Website:text_(p.Website,true),
+    Status:p.Status.select?p.Status.select.name:'','Apply Date':p['Apply Date'].date?p['Apply Date'].date.start.slice(0,10):''};
+}
+function fillProposal_(row, application) {
+  const fields=['Company','Position','Apply Date','Status'];
+  for(const field of fields.slice(0,3)) {
+    if(norm_(row[field]) && norm_(row[field])!==norm_(application[field])) return Object.assign({},row,{state:'review',reason:'Existing '+field+' conflicts with the confirmation email.'});
+  }
+  const missing=fields.filter(field=>!norm_(row[field]));
+  return Object.assign({},application,row,...missing.map(field=>({[field]:application[field]})),
+    {state:missing.length?'ready':'complete',fields:missing,reason:missing.length?'Fill: '+missing.join(', '):'All required fields already have values.'});
+}
+function fillMatch_(jobId) {
+  const response=Gmail.Users.Messages.list('me',{q:MAIL_QUERY+' "'+jobId+'"',maxResults:20});
+  if(response.nextPageToken) throw Error('Too many matching emails. Review this row manually.');
+  const matches=[];
+  for(const ref of response.messages||[]) {
+    const message=message_(ref.id);
+    try {
+      const a=parse_(message);
+      if(ids_(a.Website)[0]===jobId) matches.push(a);
+    } catch(e) {
+      // A matching recommendation is not evidence of an application.
+      const lines=message.body.split(/\r?\n/);
+      const cutoff=lines.findIndex(line=>/^(?:應徵日期|Date applied|Applied on|Application date)\s*[:：]?/i.test(line.trim()));
+      if(ids_(lines.slice(0,cutoff<0?lines.length:cutoff+1).join('\n')).includes(jobId)) throw Error('A matching confirmation could not be read reliably. Review this row manually.');
+    }
+  }
+  if(!matches.length) throw Error('No supported application confirmation found for this Website job link.');
+  const keys=new Set(matches.map(a=>[norm_(a.Company),norm_(a.Position),a['Apply Date']].join('\n')));
+  if(keys.size!==1) throw Error('Matching confirmations disagree on company, position, or application date. Review manually.');
+  return matches[0];
+}
+function previewExistingRows(cursor) {
+  checkSchema_();
+  const source=dataSource_(), response=notion_('data_sources/'+source+'/query','post',{page_size:5,...(cursor?{start_cursor:String(cursor)}:{})});
+  if(response.has_more && !response.next_cursor) throw Error('Notion pagination is incomplete. Preview again.');
+  const results=[], entries=[];
+  for(const page of response.results) {
+    const row=fillRow_(page);
+    if(!norm_(row.Website) || ['Company','Position','Apply Date','Status'].every(field=>norm_(row[field]))) continue;
+    try {
+      const jobs=[...new Set(ids_(row.Website))];
+      if(jobs.length!==1) throw Error('Website needs exactly one supported LinkedIn job link.');
+      const application=fillMatch_(jobs[0]), proposal=fillProposal_(row,application);
+      results.push(proposal);
+      if(proposal.state==='ready') entries.push({pageId:page.id,messageId:application.messageId,jobId:jobs[0],edited:page.last_edited_time});
+    } catch(e) {results.push(Object.assign({},row,{state:'review',reason:e.message}));}
+  }
+  const ticket=Utilities.getUuid();
+  CacheService.getUserCache().put('fill:'+ticket,JSON.stringify({source,entries}),1800);
+  return {ticket,results,nextCursor:response.has_more?response.next_cursor:null};
+}
+function fillExistingRows(ticket) {
+  const lock=LockService.getScriptLock();
+  if(!lock.tryLock(1000)) throw Error('Another operation is running. Try again shortly.');
+  try {
+    const cache=CacheService.getUserCache(),key='fill:'+String(ticket),raw=cache.get(key);
+    if(!raw) throw Error('This preview has expired or was already used. Preview again.');
+    cache.remove(key);
+    const preview=JSON.parse(raw),source=dataSource_();
+    if(preview.source!==source) throw Error('The Notion connection changed. Preview again.');
+    checkSchema_();
+    const results=[];
+    for(const entry of preview.entries) {
+      let row;
+      try {
+        const page=notion_('pages/'+entry.pageId);
+        const sameId=(a,b)=>String(a||'').replace(/-/g,'')===String(b||'').replace(/-/g,'');
+        if(page.archived || page.in_trash || !sameId(page.parent&&page.parent.data_source_id,source)) throw Error('The row is no longer in the connected data source. Preview again.');
+        row=fillRow_(page);
+        if(page.last_edited_time!==entry.edited || [...new Set(ids_(row.Website))].join()!==entry.jobId) {
+          results.push(Object.assign({},row,{state:'review',reason:'This row changed after preview. Preview again.'}));continue;
+        }
+        const a=parse_(message_(entry.messageId));
+        if(ids_(a.Website)[0]!==entry.jobId) throw Error('The confirmation job link changed. Preview again.');
+        const proposal=fillProposal_(row,a);
+        if(proposal.state!=='ready'){results.push(proposal);continue;}
+        const properties={},rt=value=>[{type:'text',text:{content:value}}];
+        for(const field of proposal.fields) {
+          properties[field]=field==='Company'?{title:rt(proposal[field])}:field==='Position'?{rich_text:rt(proposal[field])}:field==='Status'?{select:{name:'Applied'}}:{date:{start:proposal[field]}};
+        }
+        notion_('pages/'+entry.pageId,'patch',{properties});
+        results.push(Object.assign({},proposal,{state:'filled',reason:'Blank fields filled.'}));
+      } catch(e) {results.push(Object.assign({},row||{},{state:'error',reason:e.message}));break;}
+    }
+    return {results};
+  } finally {lock.releaseLock();}
+}
