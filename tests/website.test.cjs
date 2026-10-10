@@ -249,3 +249,16 @@ console.log('206-row performance case: one three-page Notion scan, six incomplet
  assert.equal(ctx.previewWebsiteRows().results[0].state,'review');
  console.log('URL-looking link labels do not count as extra links; real multiple links still require review.');
 }
+{
+ const ctx=context(),link='https://job-boards.greenhouse.io/embed/job_app?for=example&token=42&jr_id=test';
+ assert.equal(ctx.websiteKey_(link),ctx.websiteKey_('https://boards.greenhouse.io/example/jobs/42'));
+ assert.equal(ctx.websiteGreenhouse_(ctx.websiteUrl_(link+'&token=43')),null);
+ ctx.websiteFetch_=target=>{assert.equal(target,'https://boards-api.greenhouse.io/v1/boards/example/jobs/42?pay_transparency=true');return {body:JSON.stringify({id:42,company_name:'Example',title:'Engineer',location:{name:'City'}})};};
+ assert.equal(ctx.websiteRead_(link).Company,'Example');
+ const breezy='https://example.breezy.hr/p/012abc-engineer';
+ ctx.websiteFetch_=()=>({url:breezy,urls:[breezy],body:'<meta property="og:title" content="Engineer at Example"><meta name="twitter:label1" content="Location"><meta name="twitter:data1" content="City, State"><div class="banner"><h1>Engineer</h1></div>'});
+ const result=ctx.websiteRead_(breezy);assert.equal(result.Company,'Example');assert.equal(result.Position,'Engineer');assert.equal(result.Location,'City, State');
+ ctx.websiteFetch_=()=>({url:breezy,urls:[breezy],body:'<meta property="og:title" content="Other at Example"><div class="banner"><h1>Engineer</h1></div>'});
+ assert.throws(()=>ctx.websiteRead_(breezy),/matching job/);
+ console.log('Greenhouse embedded URL extraction/deduplication and Breezy metadata checks passed.');
+}

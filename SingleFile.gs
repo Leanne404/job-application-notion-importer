@@ -290,9 +290,26 @@ function websiteUrl_(value, base) {
   const path='/'+parts.join('/'),query=match[3]||'';
   return {host,path,query,url:'https://'+host+path+query};
 }
+function websiteGreenhouse_(u) {
+  if(!/^(?:boards|job-boards)\.greenhouse\.io$/.test(u.host))return null;
+  const match=u.path.match(/^\/([a-z\d_-]+)\/jobs\/(\d+)\/?$/i);
+  if(match)return [match[1],match[2]];
+  if(u.path!=='/embed/job_app')return null;
+  const params={};
+  for(const pair of u.query.slice(1).split('&')){const i=pair.indexOf('=');if(i>0){const k=decodeURIComponent(pair.slice(0,i));if(Object.prototype.hasOwnProperty.call(params,k))return null;params[k]=decodeURIComponent(pair.slice(i+1));}}
+  return /^[a-z\d_-]+$/i.test(params.for||'')&&/^\d+$/.test(params.token||'')?[params.for,params.token]:null;
+}
+function websiteMeta_(html,key) {
+  for(const tag of html.matchAll(/<meta\b[^>]*>/gi)){
+    const attrs={};for(const a of tag[0].matchAll(/([\w:-]+)\s*=\s*(["'])([\s\S]*?)\2/g))attrs[a[1].toLowerCase()]=a[3];
+    if((attrs.property||attrs.name||'').toLowerCase()===key)return websiteText_(attrs.content||'');
+  }
+  return '';
+}
 function websiteKey_(value) {
   const u=websiteUrl_(value), gh=u.host.match(/^(?:boards|job-boards)\.greenhouse\.io$/), m=u.path.match(/^\/([^/]+)\/jobs\/(\d+)\/?$/);
-  if(gh&&m)return 'greenhouse:'+m[1].toLowerCase()+':'+m[2];
+  const greenhouse=websiteGreenhouse_(u);
+  if(greenhouse)return 'greenhouse:'+greenhouse[0].toLowerCase()+':'+greenhouse[1];
   if(/^jobs(?:\.eu)?\.lever\.co$/.test(u.host)) {
     const lever=u.path.match(/^\/([^/]+)\/([a-f\d-]+)(?:\/apply)?\/?$/i);
     if(lever)return u.host+':'+lever[1].toLowerCase()+':'+lever[2].toLowerCase();
@@ -434,7 +451,7 @@ function websiteParse_(html,url) {
   return websiteDetails_(websiteCompany_(job),job.title,url,websiteLocation_(job),websiteSalary_(job.baseSalary));
 }
 function websiteRead_(value) {
-  const u=websiteUrl_(value),match=u.path.match(/^\/([a-z\d_-]+)\/jobs\/(\d+)\/?$/i);
+  const u=websiteUrl_(value),greenhouse=websiteGreenhouse_(u),match=greenhouse&&[null,...greenhouse];
   // Greenhouse exposes published job details without an API key.
   if(/^(?:boards|job-boards)\.greenhouse\.io$/.test(u.host)&&match) {
     const response=websiteFetch_('https://boards-api.greenhouse.io/v1/boards/'+match[1]+'/jobs/'+match[2]+'?pay_transparency=true');
@@ -444,7 +461,17 @@ function websiteRead_(value) {
     const details=websiteDetails_(job.company_name,job.title,u.url,job.location&&job.location.name,websiteSalary_(salaries));
     return Object.assign(details,{keys:[websiteKey_(u.url)]});
   }
-  const response=websiteFetch_(u.url),details=websiteParse_(response.body,response.url);
+  const response=websiteFetch_(u.url);
+  const final=websiteUrl_(response.url);let details;
+  if(/^[a-z\d-]+\.breezy\.hr$/.test(final.host)&&/^\/p\/[a-f\d]+-[^/]+\/?$/i.test(final.path)){
+    const title=websiteMeta_(response.body,'og:title');
+    const heading=response.body.match(/<div\b[^>]*class=["']banner["'][^>]*>\s*<h1[^>]*>([^<]+)<\/h1>/i);
+    const position=heading&&websiteText_(heading[1]);
+    if(!position||!title.startsWith(position+' at '))throw Error('This Breezy page has no matching job title and employer.');
+    const employer=title.slice((position+' at ').length);
+    const location=websiteMeta_(response.body,'twitter:label1')==='Location'?websiteMeta_(response.body,'twitter:data1'):'';
+    details=websiteDetails_(employer,position,response.url,location,'');
+  }else details=websiteParse_(response.body,response.url);
   return Object.assign(details,{keys:[...new Set(response.urls.map(websiteKey_))]});
 }
 function websiteDate_(value) {
