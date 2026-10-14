@@ -275,3 +275,12 @@ console.log('206-row performance case: one three-page Notion scan, six incomplet
  api.jobPost.uuid='wrong';assert.throws(()=>ctx.websiteRead_(r),/different job/);
  console.log('iCIMS same-job frame validation and Rippling job identity/location/salary passed.');
 }
+{
+ const ctx=context(),u='https://jobright.ai/jobs/info/abc123';
+ const data={jobResult:{jobId:'abc123',jobTitle:'Engineer',jobLocations:['Job City'],isDeleted:true},companyResult:{companyName:'Example',companyLocation:'Headquarters City'}};
+ ctx.websiteFetch_=url=>({url,urls:[url],body:'<script id="jobright-helper-job-detail-info" type="application/json">'+JSON.stringify(data)+'</script>'});
+ const r=ctx.websiteRead_(u);assert.equal(r.Company,'Example');assert.equal(r.Location,'Job City');assert.equal(r['Salary Range'],'');assert.match(r.notice,/removed or hidden/);
+ assert.match(ctx.websiteProposal_({Company:'',Position:'',Status:'','Apply Date':''},r,null).reason,/removed or hidden/);
+ data.jobResult.jobId='other';assert.throws(()=>ctx.websiteRead_(u),/different job/);
+ console.log('Jobright identity, job versus headquarters location, and historical listing notice passed.');
+}

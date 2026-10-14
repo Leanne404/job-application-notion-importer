@@ -473,7 +473,16 @@ function websiteRead_(value) {
     }
   }
   const final=websiteUrl_(response.url);let details;
-  if(final.host==='ats.rippling.com'){
+  if(/^(?:www\.)?jobright\.ai$/.test(final.host)){
+    const path=final.path.match(/^\/jobs\/info\/([a-f\d]+)\/?$/i);
+    const script=response.body.match(/<script\b[^>]*\bid=["']jobright-helper-job-detail-info["'][^>]*>([\s\S]*?)<\/script>/i);
+    if(!path||!script)throw Error('This Jobright page has no readable job data.');
+    const data=JSON.parse(script[1]),job=data.jobResult,company=data.companyResult;
+    if(!job||job.jobId!==path[1])throw Error('The Jobright page returned a different job.');
+    const location=Array.isArray(job.jobLocations)&&job.jobLocations.length?job.jobLocations.map(websiteValue_).filter(Boolean).join('; '):websiteValue_(job.jobLocation);
+    details=websiteDetails_(company&&company.companyName,job.jobTitle,response.url,location,'');
+    if(job.isDeleted||job.hiddenJob)details.notice='Jobright marks this listing as removed or hidden. Details can be saved for your application history; current availability is not confirmed.';
+  }else if(final.host==='ats.rippling.com'){
     const path=final.path.match(/^\/([^/]+)\/jobs\/([a-f\d-]+)\/?$/i);
     const script=response.body.match(/<script\b[^>]*\bid=["']__NEXT_DATA__["'][^>]*>([\s\S]*?)<\/script>/i);
     if(!path||!script)throw Error('This Rippling page has no readable job data.');
@@ -556,7 +565,7 @@ function websiteProposal_(row,details,date,fields) {
   for(const field of ['Company','Position'])if(norm_(row[field])&&norm_(details[field])&&norm_(row[field])!==norm_(details[field]))return Object.assign({},row,{state:'review',reason:'Existing '+field+' differs from the website. Review manually.'});
   const values=Object.assign({},details,{'Apply Date':date||'Today when confirmed'});
   const missing=fields.filter(k=>!norm_(row[k])),available=missing.filter(k=>norm_(values[k])),unavailable=missing.filter(k=>!norm_(values[k]));
-  const reason=(available.length?'Fill: '+available.join(', ')+'. ':'No available values to fill. ')+(unavailable.length?'Not found: '+unavailable.join(', ')+'. ':'')+'Original Website and existing values are kept.';
+  const reason=(available.length?'Fill: '+available.join(', ')+'. ':'No available values to fill. ')+(unavailable.length?'Not found: '+unavailable.join(', ')+'. ':'')+'Original Website and existing values are kept.'+(details.notice?' '+details.notice:'');
   return Object.assign({},values,row,...available.map(k=>({[k]:values[k]})),{Website:details.Website,fields:available,state:available.length?'ready':'review',reason});
 }
 // Reuse a private per-preview snapshot instead of rereading Notion for every batch.
