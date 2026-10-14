@@ -262,3 +262,16 @@ console.log('206-row performance case: one three-page Notion scan, six incomplet
  assert.throws(()=>ctx.websiteRead_(breezy),/matching job/);
  console.log('Greenhouse embedded URL extraction/deduplication and Breezy metadata checks passed.');
 }
+{
+ const ctx=context(),u='https://careers.example.icims.com/jobs/42/engineer/job';let count=0;
+ ctx.websiteFetch_=target=>({url:target,urls:[target],body:++count===1?'<iframe id="noscript_icims_content_iframe" src="'+u+'?in_iframe=1"></iframe>':html({...posting,url:u})});
+ assert.equal(ctx.websiteRead_(u).Company,'Example & Co');assert.equal(count,2);
+ ctx.websiteFetch_=target=>({url:target,urls:[target],body:'<iframe id="noscript_icims_content_iframe" src="https://other.example.com/jobs/42"></iframe>'});
+ assert.throws(()=>ctx.websiteRead_(u),/does not match/);
+ const r='https://ats.rippling.com/example/jobs/abc-123';
+ const api={jobBoard:{slug:'example',companyName:'Example'},jobPost:{uuid:'abc-123',name:'Engineer',workLocations:['City, State'],payRangeDetails:[{currency:'USD',frequency:'YEAR',rangeStart:80000,rangeEnd:100000}]}};
+ ctx.websiteFetch_=target=>({url:target,urls:[target],body:'<script id="__NEXT_DATA__" type="application/json">'+JSON.stringify({props:{pageProps:{apiData:api}}})+'</script>'});
+ const result=ctx.websiteRead_(r);assert.equal(result.Company,'Example');assert.equal(result.Location,'City, State');assert.equal(result['Salary Range'],'USD 80,000–100,000 / year');
+ api.jobPost.uuid='wrong';assert.throws(()=>ctx.websiteRead_(r),/different job/);
+ console.log('iCIMS same-job frame validation and Rippling job identity/location/salary passed.');
+}
