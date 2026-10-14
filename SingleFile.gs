@@ -461,9 +461,28 @@ function websiteRead_(value) {
     const details=websiteDetails_(job.company_name,job.title,u.url,job.location&&job.location.name,websiteSalary_(salaries));
     return Object.assign(details,{keys:[websiteKey_(u.url)]});
   }
-  const response=websiteFetch_(u.url);
+  let response=websiteFetch_(u.url);
+  if(/\.icims\.com$/.test(u.host)&&/^\/jobs\/\d+\//.test(u.path)){
+    const frames=[...response.body.matchAll(/<iframe\b[^>]*>/gi)].filter(x=>/\bid=["']noscript_icims_content_iframe["']/i.test(x[0]));
+    if(frames.length===1){
+      const src=frames[0][0].match(/\bsrc=["']([^"']+)["']/i);
+      if(src){const target=websiteUrl_(websiteText_(src[1]),response.url);
+        if(target.host!==u.host||target.path!==u.path)throw Error('The embedded job page does not match the requested job.');
+        const inner=websiteFetch_(target.url);response={...inner,urls:[...response.urls,...inner.urls]};
+      }
+    }
+  }
   const final=websiteUrl_(response.url);let details;
-  if(/^[a-z\d-]+\.breezy\.hr$/.test(final.host)&&/^\/p\/[a-f\d]+-[^/]+\/?$/i.test(final.path)){
+  if(final.host==='ats.rippling.com'){
+    const path=final.path.match(/^\/([^/]+)\/jobs\/([a-f\d-]+)\/?$/i);
+    const script=response.body.match(/<script\b[^>]*\bid=["']__NEXT_DATA__["'][^>]*>([\s\S]*?)<\/script>/i);
+    if(!path||!script)throw Error('This Rippling page has no readable job data.');
+    const data=JSON.parse(script[1]),api=data.props&&data.props.pageProps&&data.props.pageProps.apiData;
+    const job=api&&api.jobPost;
+    if(!job||job.uuid!==path[2]||!api.jobBoard||api.jobBoard.slug!==path[1])throw Error('The Rippling page returned a different job.');
+    const salary=(job.payRangeDetails||[]).map(p=>({currency:p.currency,value:{minValue:p.rangeStart,maxValue:p.rangeEnd,unitText:p.frequency}}));
+    details=websiteDetails_(job.companyName||api.jobBoard.companyName,job.name,response.url,(job.workLocations||[]).map(websiteValue_).filter(Boolean).join('; '),websiteSalary_(salary));
+  }else if(/^[a-z\d-]+\.breezy\.hr$/.test(final.host)&&/^\/p\/[a-f\d]+-[^/]+\/?$/i.test(final.path)){
     const title=websiteMeta_(response.body,'og:title');
     const heading=response.body.match(/<div\b[^>]*class=["']banner["'][^>]*>\s*<h1[^>]*>([^<]+)<\/h1>/i);
     const position=heading&&websiteText_(heading[1]);
