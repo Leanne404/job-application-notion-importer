@@ -188,7 +188,9 @@ function websiteRead_(value) {
     const details=websiteDetails_(job.company_name,job.title,u.url,job.location&&job.location.name,websiteSalary_(salaries));
     return Object.assign(details,{keys:[websiteKey_(u.url)]});
   }
-  let response=websiteFetch_(u.url);
+  const jobvite=u.host==='jobs.jobvite.com'&&/^\/[^/]+\/job\/[a-z\d]+\/?$/i.test(u.path);
+  let response=websiteFetch_(jobvite?'https://'+u.host+u.path:u.url);
+  if(jobvite)response.urls=[u.url,...response.urls];
   if(/\.icims\.com$/.test(u.host)&&/^\/jobs\/\d+\//.test(u.path)){
     const frames=[...response.body.matchAll(/<iframe\b[^>]*>/gi)].filter(x=>/\bid=["']noscript_icims_content_iframe["']/i.test(x[0]));
     if(frames.length===1){
@@ -200,7 +202,16 @@ function websiteRead_(value) {
     }
   }
   const final=websiteUrl_(response.url);let details;
-  if(/^(?:www\.)?jobright\.ai$/.test(final.host)){
+  if(final.host==='jobs.jobvite.com'&&/^\/[^/]+\/job\/[a-z\d]+\/?$/i.test(final.path)){
+    const heading=response.body.match(/<h2\b[^>]*class=["']jv-header["'][^>]*>([\s\S]*?)<\/h2>/i);
+    const title=response.body.match(/<title[^>]*>([^<]*)<\/title>/i);
+    const position=heading&&websiteText_(heading[1].replace(/<[^>]*>/g,''));
+    const pageTitle=title&&websiteText_(title[1]),suffix=' Careers - '+position;
+    if(!position||!pageTitle||!pageTitle.endsWith(suffix))throw Error('This Jobvite page has no matching employer and job title.');
+    const meta=response.body.match(/<p\b[^>]*class=["']jv-job-detail-meta["'][^>]*>([\s\S]*?)<\/p>/i);
+    const locations=meta?meta[1].split(/<span\b[^>]*class=["']jv-inline-separator["'][^>]*>\s*<\/span>/i).slice(1).map(x=>websiteText_(x.replace(/<[^>]*>/g,''))).filter(Boolean):[];
+    details=websiteDetails_(pageTitle.slice(0,-suffix.length),position,response.url,locations.join('; '),'');
+  }else if(/^(?:www\.)?jobright\.ai$/.test(final.host)){
     const path=final.path.match(/^\/jobs\/info\/([a-f\d]+)\/?$/i);
     const script=response.body.match(/<script\b[^>]*\bid=["']jobright-helper-job-detail-info["'][^>]*>([\s\S]*?)<\/script>/i);
     if(!path||!script)throw Error('This Jobright page has no readable job data.');

@@ -284,3 +284,10 @@ console.log('206-row performance case: one three-page Notion scan, six incomplet
  data.jobResult.jobId='other';assert.throws(()=>ctx.websiteRead_(u),/different job/);
  console.log('Jobright identity, job versus headquarters location, and historical listing notice passed.');
 }
+{
+ const ctx=context(),u='https://jobs.jobvite.com/example/job/abc123';
+ ctx.websiteFetch_=target=>{assert.equal(target,u);return {url:target,urls:[target],body:'<title>Example Careers - Engineer</title><h2 class="jv-header">Engineer</h2><p class="jv-job-detail-meta">Technology<span class="jv-inline-separator"></span>City, State<span class="jv-inline-separator"></span>Remote, US</p>'};};
+ const r=ctx.websiteRead_(u+'?jr_id=tracking');assert.equal(r.Company,'Example');assert.equal(r.Position,'Engineer');assert.equal(r.Location,'City, State; Remote, US');assert.equal(r['Salary Range'],'');assert(r.keys.includes(ctx.websiteKey_(u+'?jr_id=tracking')));
+ ctx.websiteFetch_=target=>({url:target,urls:[target],body:'<title>Example Careers - Other</title><h2 class="jv-header">Engineer</h2>'});assert.throws(()=>ctx.websiteRead_(u),/matching employer/);
+ console.log('Jobvite metadata and tracking-free fetch passed.');
+}
