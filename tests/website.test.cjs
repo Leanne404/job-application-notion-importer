@@ -300,3 +300,12 @@ console.log('206-row performance case: one three-page Notion scan, six incomplet
  assert.equal(ctx.websiteRead_(ea).Location,'City');assert.throws(()=>ctx.websiteRead_(ea.replace('42','43')),/does not match/);
  console.log('SmartRecruiters API route and EA job identity tests passed.');
 }
+{
+ const ctx=context(),u='https://tenant.fa.us2.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1/job/42';
+ const job={Id:'42',Title:'Engineer',PrimaryLocation:'Job City',CorporateDescriptionStr:'<p>Equal Employment Opportunity</p><p>Example, its parent, subsidiaries, and related companies (Example) provide equal employment.</p>'};
+ ctx.websiteFetch_=target=>{assert(target.includes('recruitingCEJobRequisitionDetails'));assert(decodeURIComponent(target).includes('ById;Id="42",siteNumber=CX_1'));return {body:JSON.stringify({items:[job]})};};
+ let r=ctx.websiteRead_(u);assert.equal(r.Company,'Example');assert.equal(r.Location,'Job City');
+ job.CorporateDescriptionStr='';r=ctx.websiteRead_(u);assert.equal(r.Company,'');
+ job.Id='43';assert.throws(()=>ctx.websiteRead_(u),/requested job/);
+ console.log('Oracle endpoint, employer evidence, missing fields and job identity passed.');
+}
