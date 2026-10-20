@@ -291,3 +291,12 @@ console.log('206-row performance case: one three-page Notion scan, six incomplet
  ctx.websiteFetch_=target=>({url:target,urls:[target],body:'<title>Example Careers - Other</title><h2 class="jv-header">Engineer</h2>'});assert.throws(()=>ctx.websiteRead_(u),/matching employer/);
  console.log('Jobvite metadata and tracking-free fetch passed.');
 }
+{
+ const ctx=context(),u='https://jobs.smartrecruiters.com/oneclick-ui/company/Example/publication/abc-123';
+ ctx.websiteFetch_=target=>{assert.equal(target,'https://api.smartrecruiters.com/v1/companies/Example/postings/abc-123');return {body:JSON.stringify({uuid:'abc-123',name:'Engineer',company:{identifier:'Example',name:'Example Inc'},location:{fullLocation:'City'}})};};
+ assert.equal(ctx.websiteRead_(u).Company,'Example Inc');
+ const ea='https://jobs.ea.com/en_US/careers/JobDetail?jobId=42';
+ ctx.websiteFetch_=url=>({url,urls:[url],body:'<meta property="og:title" content="Engineer"><meta property="og:site_name" content="Example"><meta property="og:url" content="https://jobs.ea.com/en_US/careers/JobDetail/Engineer/42"><strong>Locations</strong>: City<br>'});
+ assert.equal(ctx.websiteRead_(ea).Location,'City');assert.throws(()=>ctx.websiteRead_(ea.replace('42','43')),/does not match/);
+ console.log('SmartRecruiters API route and EA job identity tests passed.');
+}
