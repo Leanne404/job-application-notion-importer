@@ -452,6 +452,13 @@ function websiteParse_(html,url) {
 }
 function websiteRead_(value) {
   const u=websiteUrl_(value),greenhouse=websiteGreenhouse_(u),match=greenhouse&&[null,...greenhouse];
+  const smart=u.host==='jobs.smartrecruiters.com'&&u.path.match(/^\/oneclick-ui\/company\/([a-z\d_-]+)\/publication\/([a-f\d-]+)\/?$/i);
+  if(smart){
+    const response=websiteFetch_('https://api.smartrecruiters.com/v1/companies/'+smart[1]+'/postings/'+smart[2]),job=JSON.parse(response.body);
+    if(job.uuid!==smart[2]||!job.company||job.company.identifier!==smart[1])throw Error('SmartRecruiters returned a different job.');
+    const details=websiteDetails_(job.company.name,job.name,u.url,job.location&&job.location.fullLocation,'');
+    return {...details,keys:[websiteKey_(u.url),...(job.postingUrl?[websiteKey_(job.postingUrl)]:[])]};
+  }
   // Greenhouse exposes published job details without an API key.
   if(/^(?:boards|job-boards)\.greenhouse\.io$/.test(u.host)&&match) {
     const response=websiteFetch_('https://boards-api.greenhouse.io/v1/boards/'+match[1]+'/jobs/'+match[2]+'?pay_transparency=true');
@@ -475,7 +482,14 @@ function websiteRead_(value) {
     }
   }
   const final=websiteUrl_(response.url);let details;
-  if(final.host==='jobs.jobvite.com'&&/^\/[^/]+\/job\/[a-z\d]+\/?$/i.test(final.path)){
+  if(final.host==='jobs.ea.com'&&/\/careers\/JobDetail(?:\/|$)/i.test(final.path)){
+    const title=websiteMeta_(response.body,'og:title'),company=websiteMeta_(response.body,'og:site_name');
+    const canonical=websiteMeta_(response.body,'og:url');
+    const requested=(u.query.match(/(?:[?&])jobId=(\d+)(?:&|$)/)||u.path.match(/\/(\d+)\/?$/)||[])[1];
+    if(!requested||!canonical||!websiteUrl_(canonical).path.endsWith('/'+requested)||!title||!company)throw Error('The EA page does not match the requested job.');
+    const location=response.body.match(/<strong>Locations<\/strong>\s*:\s*([^<]+)/i);
+    details=websiteDetails_(company,title,response.url,location?websiteText_(location[1]):'','');
+  }else if(final.host==='jobs.jobvite.com' &&/^\/[^/]+\/job\/[a-z\d]+\/?$/i.test(final.path)){
     const heading=response.body.match(/<h2\b[^>]*class=["']jv-header["'][^>]*>([\s\S]*?)<\/h2>/i);
     const title=response.body.match(/<title[^>]*>([^<]*)<\/title>/i);
     const position=heading&&websiteText_(heading[1].replace(/<[^>]*>/g,''));
