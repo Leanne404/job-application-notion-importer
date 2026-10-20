@@ -186,6 +186,19 @@ function websiteRead_(value) {
     const details=websiteDetails_(job.company.name,job.name,u.url,job.location&&job.location.fullLocation,'');
     return {...details,keys:[websiteKey_(u.url),...(job.postingUrl?[websiteKey_(job.postingUrl)]:[])]};
   }
+  const oracle=/\.oraclecloud\.com$/.test(u.host)&&u.path.match(/^\/hcmUI\/CandidateExperience\/([a-z-]+)\/sites\/([a-z\d_-]+)\/job\/(\d+)\/?$/i);
+  if(oracle){
+    const finder='ById;Id="'+oracle[3]+'",siteNumber='+oracle[2];
+    const response=websiteFetch_('https://'+u.host+'/hcmRestApi/resources/latest/recruitingCEJobRequisitionDetails?onlyData=true&finder='+encodeURIComponent(finder));
+    const data=JSON.parse(response.body),jobs=data.items||[];
+    if(jobs.length!==1||String(jobs[0].Id)!==oracle[3])throw Error('Oracle did not return the requested job. It may no longer be available.');
+    const job=jobs[0];
+    const corporate=websiteText_(String(job.CorporateDescriptionStr||'').replace(/<[^>]*>/g,' '));
+    const employer=corporate.replace(/^Equal Employment Opportunity\s+/i,'').match(/(?:^|[.!?]\s+|Equal Employment Opportunity\s+)([A-Z][A-Za-z0-9 &.,'-]{1,100}?), its parent, subsidiaries, and related companies\b/);
+    const company=websiteValue_(job.LegalEmployer)||websiteValue_(employer&&employer[1])||websiteCompany_({description:job.ExternalDescriptionStr});
+    const details=websiteDetails_(company,job.Title,u.url,job.PrimaryLocation,'');
+    return {...details,keys:[websiteKey_(u.url)]};
+  }
   // Greenhouse exposes published job details without an API key.
   if(/^(?:boards|job-boards)\.greenhouse\.io$/.test(u.host)&&match) {
     const response=websiteFetch_('https://boards-api.greenhouse.io/v1/boards/'+match[1]+'/jobs/'+match[2]+'?pay_transparency=true');
