@@ -123,6 +123,8 @@ It fills whatever it can find: blank **Company, Position, Location, Salary Range
 
 To update an existing deployment, replace Apps Script `Code.gs` with the latest `SingleFile.gs`, then **Deploy → Manage deployments → Edit → New version → Deploy** and refresh your existing URL. Saved Notion settings remain available.
 
+**Thatch and JobDiva:** Thatch embedded job data is supported. For JobDiva, keep the full `www1.jobdiva.com/portal/` link, including `a=...` and `#/jobs/...`. Duplicate checks include the tenant and job number and ignore `jr_id`. The tool automatically obtains a temporary anonymous JobDiva session; no account or API key is needed, and the session is not saved. Missing employer or salary data stays blank; recruiter details are not assumed to identify the employer.
+
 ### Method 2: terminal
 
 **You are running the tool on your computer.** This requires a separate one-time Google login setup; it does not use your Apps Script deployment.
@@ -366,6 +368,8 @@ Website 補資料還可使用以下選用欄位，名稱需完全相符：
 **驗證範圍：** 已實際唯讀測試 Figma 的 Greenhouse 職缺與 Stripe 官網職缺，成功取得公司、職稱、地點和薪資；Spotify 的 Lever 頁面回傳 403，工具正確標示無法讀取。這些案例不代表每個職缺都能讀；你部署的 Apps Script 與 Notion 帳號仍需先預覽確認。
 
 更新已部署的網頁：用最新 `SingleFile.gs` 取代 Apps Script 的 `Code.gs`，按 **部署 → 管理部署 → 編輯 → 新版本 → 部署**，再重新整理原網址。原 Notion 設定可沿用。
+
+**Thatch 與 JobDiva：** 支援 Thatch 頁面內的職缺資料。JobDiva 請保留完整 `www1.jobdiva.com/portal/` 連結，包括 `a=...` 和 `#/jobs/...`。去重會比對入口與職缺編號，忽略追蹤參數 `jr_id`。工具自動取得 JobDiva 的臨時匿名 session，不需要帳號或 API key，也不會儲存 session。公司或薪資沒有可靠資料就留白，不會把招募人員資訊當成雇主名稱。
 
 ### 方法二：終端機版
 

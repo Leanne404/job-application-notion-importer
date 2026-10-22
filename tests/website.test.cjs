@@ -309,3 +309,40 @@ console.log('206-row performance case: one three-page Notion scan, six incomplet
  job.Id='43';assert.throws(()=>ctx.websiteRead_(u),/requested job/);
  console.log('Oracle endpoint, employer evidence, missing fields and job identity passed.');
 }
+
+// JobDiva fragments carry identity; only public anonymous portal sessions are used.
+{
+ const ctx=context(),base='https://www1.jobdiva.com/portal/?a=synthetictenant',link=base+'&jr_id=tracking#/jobs/42';
+ assert.equal(ctx.websiteLinks_(link)[0],link);
+ assert.equal(ctx.websiteKey_(link),ctx.websiteKey_(base+'#/jobs/42'));
+ assert.notEqual(ctx.websiteKey_(link),ctx.websiteKey_(base+'#/jobs/43'));
+ assert.notEqual(ctx.websiteKey_(link),ctx.websiteKey_(link.replace('synthetictenant','another')));
+ assert.throws(()=>ctx.websiteRead_(base),/JobDiva portal link/);
+ assert.throws(()=>ctx.websiteRead_(base+'&a=another#/jobs/42'),/Duplicate/);
+ let state='ok',calls=[];
+ ctx.websiteCheckHost_=host=>assert.equal(host,'ws.jobdiva.com');
+ ctx.UrlFetchApp={fetch:(url,options)=>{
+   calls.push(url);assert.equal(options.followRedirects,false);assert.equal(options.headers.Authorization,undefined);
+   assert.equal(options.headers.a,'synthetictenant');
+   const auth=url.endsWith('/auth/a');
+   if(!auth)assert.equal(options.headers.token,'synthetic-session');
+   return {getResponseCode:()=>state==='redirect'?302:200,getContentText:()=>JSON.stringify(auth?
+    {a:state==='portal'?'wrong':'synthetictenant',portalID:1,token:'synthetic-session'}:
+    {job:{id:state==='mismatch'?43:42,title:'Engineer',company:null,mainLocation:{city:'Example City',state:'CA'},payRate:'$40-$50',payFrequency:'hour',hideCompensation:state==='hidden'}})};
+ }};
+ let result=ctx.websiteRead_(link);
+ assert.equal(result.Position,'Engineer');assert.equal(result.Company,'');assert.equal(result.Website,link);
+ assert.equal(result.Location,'Example City, CA');assert.equal(result['Salary Range'],'$40-$50 / hour');
+ state='hidden';assert.equal(ctx.websiteRead_(link)['Salary Range'],'');
+ state='mismatch';assert.throws(()=>ctx.websiteRead_(link),/requested job/);
+ state='portal';assert.throws(()=>ctx.websiteRead_(link),/different portal/);
+ state='redirect';calls=[];assert.throws(()=>ctx.websiteRead_(link),/public job data/);assert.equal(calls.length,1);
+}
+{
+ const ctx=context(),url='https://thatch.com/jobs/software-engineer-42';
+ let id=42;
+ ctx.websiteFetch_=link=>({url:link,urls:[link],body:'<script id="__NEXT_DATA__" type="application/json">'+JSON.stringify({props:{pageProps:{job:{id,title:'Engineer',company_name:'Example Employer',location:{name:'Remote (US)'},pay_input_ranges:[{min_cents:10000000,max_cents:12000000,currency_type:'USD'}]}}}})+'</script>'});
+ const result=ctx.websiteRead_(url);assert.equal(result.Company,'Example Employer');assert.equal(result.Position,'Engineer');assert.equal(result.Location,'Remote (US)');assert.match(result['Salary Range'],/100,000–120,000/);
+ id=43;assert.throws(()=>ctx.websiteRead_(url),/requested job/);
+}
+console.log('Thatch embedded data and identity; JobDiva fragment identity, anonymous requests, missing fields and redirect rejection passed.');

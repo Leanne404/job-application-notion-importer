@@ -288,7 +288,32 @@ function websiteUrl_(value, base) {
   const parts=[];
   for(const piece of (match[2]||'/').slice(1).split('/')) {if(piece==='..')parts.pop();else if(piece!=='.')parts.push(piece);}
   const path='/'+parts.join('/'),query=match[3]||'';
-  return {host,path,query,url:'https://'+host+path+query};
+  // JobDiva uses the fragment as its job route, not merely a page anchor.
+  const hash=host==='www1.jobdiva.com'&&path==='/portal/'?(url.match(/#.*$/)||[''])[0]:'';
+  return {host,path,query,hash,url:'https://'+host+path+query+hash};
+}
+function websiteJobdiva_(u) {
+  if(u.host!=='www1.jobdiva.com'||u.path!=='/portal/')return null;
+  const route=(u.hash||'').match(/^#\/jobs\/(\d+)\/?$/),params={};
+  for(const pair of u.query.slice(1).split('&')){
+    const i=pair.indexOf('=');if(i<0)continue;
+    const key=decodeURIComponent(pair.slice(0,i));
+    if(Object.prototype.hasOwnProperty.call(params,key))throw Error('Duplicate JobDiva URL parameters.');
+    params[key]=decodeURIComponent(pair.slice(i+1));
+  }
+  if(!route||! /^[a-z\d]+$/i.test(params.a||'')||params.compid&&!/^\d+$/.test(params.compid))throw Error('Use a JobDiva portal link containing a tenant and #/jobs/job-number.');
+  return {id:route[1],tenant:params.a,compid:params.compid||'-1'};
+}
+// Only the public JobDiva anonymous session is used, never account credentials.
+// Do not follow redirects with these site-specific headers or persist the session.
+function websiteJobdivaRequest_(path,headers) {
+  const host='ws.jobdiva.com';websiteCheckHost_(host);
+  let response;
+  try{response=UrlFetchApp.fetch('https://'+host+'/candPortal/rest/'+path,{method:'get',headers,muteHttpExceptions:true,followRedirects:false});}
+  catch(e){throw Error('JobDiva could not be reached. Try again later.');}
+  if(response.getResponseCode()!==200)throw Error('JobDiva could not return public job data. The listing may be unavailable.');
+  const body=response.getContentText();if(body.length>3000000)throw Error('The JobDiva response is too large.');
+  try{return JSON.parse(body);}catch(e){throw Error('JobDiva returned unreadable job data.');}
 }
 function websiteGreenhouse_(u) {
   if(!/^(?:boards|job-boards)\.greenhouse\.io$/.test(u.host))return null;
@@ -308,6 +333,8 @@ function websiteMeta_(html,key) {
 }
 function websiteKey_(value) {
   const u=websiteUrl_(value), gh=u.host.match(/^(?:boards|job-boards)\.greenhouse\.io$/), m=u.path.match(/^\/([^/]+)\/jobs\/(\d+)\/?$/);
+  const jd=websiteJobdiva_(u);
+  if(jd)return 'jobdiva:'+u.host+':'+jd.tenant+':'+jd.compid+':'+jd.id;
   const greenhouse=websiteGreenhouse_(u);
   if(greenhouse)return 'greenhouse:'+greenhouse[0].toLowerCase()+':'+greenhouse[1];
   if(/^jobs(?:\.eu)?\.lever\.co$/.test(u.host)) {
@@ -452,6 +479,18 @@ function websiteParse_(html,url) {
 }
 function websiteRead_(value) {
   const u=websiteUrl_(value),greenhouse=websiteGreenhouse_(u),match=greenhouse&&[null,...greenhouse];
+  const jd=websiteJobdiva_(u);
+  if(jd){
+    const headers={a:jd.tenant,portalID:'1',compid:jd.compid};
+    const session=websiteJobdivaRequest_('auth/a',headers);
+    if(session.a!==jd.tenant||!session.token||String(session.portalID)!=='1')throw Error('JobDiva returned a different portal.');
+    const data=websiteJobdivaRequest_('job/getdetailbyjobid/'+jd.id+'?compid='+encodeURIComponent(jd.compid==='-1'?'':jd.compid),{...headers,token:String(session.token)}),job=data.job;
+    if(!job||String(job.id)!==jd.id||!job.title)throw Error('JobDiva did not return the requested job.');
+    const location=[job.mainLocation,...(job.otherLocations||[])].filter(Boolean).map(p=>[p.city,p.state,p.country].map(websiteValue_).filter(Boolean).join(', ')).filter(Boolean);
+    const company=websiteValue_(job.company)||websiteCompany_({description:job.jobDescription});
+    const salary=job.hideCompensation?'':websiteValue_([job.payRate,job.payRate&&job.payFrequency].filter(Boolean).join(' / '));
+    return {...websiteDetails_(company,job.title,u.url,[...new Set(location)].join('; '),salary),keys:[websiteKey_(u.url)]};
+  }
   const smart=u.host==='jobs.smartrecruiters.com'&&u.path.match(/^\/oneclick-ui\/company\/([a-z\d_-]+)\/publication\/([a-f\d-]+)\/?$/i);
   if(smart){
     const response=websiteFetch_('https://api.smartrecruiters.com/v1/companies/'+smart[1]+'/postings/'+smart[2]),job=JSON.parse(response.body);
@@ -495,7 +534,14 @@ function websiteRead_(value) {
     }
   }
   const final=websiteUrl_(response.url);let details;
-  if(final.host==='jobs.ea.com'&&/\/careers\/JobDetail(?:\/|$)/i.test(final.path)){
+  if(final.host==='thatch.com'&&/^\/jobs\//.test(final.path)){
+    const id=(u.path.match(/(?:-|\/)(\d+)\/?$/)||[])[1];
+    const script=response.body.match(/<script\b[^>]*\bid=["']__NEXT_DATA__["'][^>]*>([\s\S]*?)<\/script>/i);
+    const data=script&&JSON.parse(script[1]),job=data&&data.props&&data.props.pageProps&&data.props.pageProps.job;
+    if(!id||!job||String(job.id)!==id||!job.title||!job.company_name)throw Error('Thatch did not return the requested job.');
+    const salary=(job.pay_input_ranges||[]).map(p=>({currency:p.currency_type,value:{minValue:typeof p.min_cents==='number'?p.min_cents/100:undefined,maxValue:typeof p.max_cents==='number'?p.max_cents/100:undefined}}));
+    details=websiteDetails_(job.company_name,job.title,u.url,job.location&&job.location.name,websiteSalary_(salary));
+  }else if(final.host==='jobs.ea.com' &&/\/careers\/JobDetail(?:\/|$)/i.test(final.path)){
     const title=websiteMeta_(response.body,'og:title'),company=websiteMeta_(response.body,'og:site_name');
     const canonical=websiteMeta_(response.body,'og:url');
     const requested=(u.query.match(/(?:[?&])jobId=(\d+)(?:&|$)/)||u.path.match(/\/(\d+)\/?$/)||[])[1];
