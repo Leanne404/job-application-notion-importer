@@ -210,8 +210,8 @@ function websiteRead_(value) {
   if(jd){
     const headers={a:jd.tenant,portalID:'1',compid:jd.compid};
     const session=websiteJobdivaRequest_('auth/a',headers);
-    if(session.a!==jd.tenant||!session.token||String(session.portalID)!=='1')throw Error('JobDiva returned a different portal.');
-    const data=websiteJobdivaRequest_('job/getdetailbyjobid/'+jd.id+'?compid='+encodeURIComponent(jd.compid==='-1'?'':jd.compid),{...headers,token:String(session.token)}),job=data.job;
+    if(session.a!==jd.tenant||typeof session.token!=='string'||!session.token||!/^\d+$/.test(String(session.portalID))||Number(session.portalID)<1)throw Error('JobDiva returned a different portal.');
+    const data=websiteJobdivaRequest_('job/getdetailbyjobid/'+jd.id+'?compid='+encodeURIComponent(jd.compid==='-1'?'':jd.compid),{...headers,portalID:String(session.portalID),token:session.token}),job=data.job;
     if(!job||String(job.id)!==jd.id||!job.title)throw Error('JobDiva did not return the requested job.');
     const location=[job.mainLocation,...(job.otherLocations||[])].filter(Boolean).map(p=>[p.city,p.state,p.country].map(websiteValue_).filter(Boolean).join(', ')).filter(Boolean);
     const company=websiteValue_(job.company)||websiteCompany_({description:job.jobDescription});

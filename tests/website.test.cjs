@@ -319,20 +319,21 @@ console.log('206-row performance case: one three-page Notion scan, six incomplet
  assert.notEqual(ctx.websiteKey_(link),ctx.websiteKey_(link.replace('synthetictenant','another')));
  assert.throws(()=>ctx.websiteRead_(base),/JobDiva portal link/);
  assert.throws(()=>ctx.websiteRead_(base+'&a=another#/jobs/42'),/Duplicate/);
- let state='ok',calls=[];
+ let state='ok',calls=[],portal=29;
  ctx.websiteCheckHost_=host=>assert.equal(host,'ws.jobdiva.com');
  ctx.UrlFetchApp={fetch:(url,options)=>{
    calls.push(url);assert.equal(options.followRedirects,false);assert.equal(options.headers.Authorization,undefined);
    assert.equal(options.headers.a,'synthetictenant');
    const auth=url.endsWith('/auth/a');
-   if(!auth)assert.equal(options.headers.token,'synthetic-session');
+   if(!auth){assert.equal(options.headers.token,'synthetic-session');assert.equal(options.headers.portalID,String(portal));}else assert.equal(options.headers.portalID,'1');
    return {getResponseCode:()=>state==='redirect'?302:200,getContentText:()=>JSON.stringify(auth?
-    {a:state==='portal'?'wrong':'synthetictenant',portalID:1,token:'synthetic-session'}:
+    {a:state==='portal'?'wrong':'synthetictenant',portalID:portal,token:'synthetic-session'}:
     {job:{id:state==='mismatch'?43:42,title:'Engineer',company:null,mainLocation:{city:'Example City',state:'CA'},payRate:'$40-$50',payFrequency:'hour',hideCompensation:state==='hidden'}})};
  }};
  let result=ctx.websiteRead_(link);
  assert.equal(result.Position,'Engineer');assert.equal(result.Company,'');assert.equal(result.Website,link);
  assert.equal(result.Location,'Example City, CA');assert.equal(result['Salary Range'],'$40-$50 / hour');
+ portal=2193;assert.equal(ctx.websiteRead_(link).Position,'Engineer');
  state='hidden';assert.equal(ctx.websiteRead_(link)['Salary Range'],'');
  state='mismatch';assert.throws(()=>ctx.websiteRead_(link),/requested job/);
  state='portal';assert.throws(()=>ctx.websiteRead_(link),/different portal/);
