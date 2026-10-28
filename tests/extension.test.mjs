@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import {structuredFields,validatedAI,exportPayload,publicJobUrl} from '../extension/core.mjs';
+const job={'@type':'JobPosting',title:'Engineer',hiringOrganization:{name:'Example'},jobLocation:{address:{addressLocality:'Boston',addressRegion:'MA'}}};
+assert.equal(structuredFields([JSON.stringify(job)]).values.Company,'Example');
+assert.deepEqual(structuredFields([JSON.stringify([job,job])]).values,{});
+const evidence='Example is hiring an Engineer';
+const parsed=validatedAI(JSON.stringify({Company:{value:'Example',evidence},Position:{value:'Invented',evidence}}),'x'.repeat(1500)+' '+evidence);
+assert.equal(parsed.values.Company,'Example');assert.equal(parsed.values.Position,'');
+for(const u of ['https://127.0.0.1/job','file:///tmp/job','https://'+'mail.google.com/','https://example.com/?access_token=private','https://job-boards.greenhouse.io/embed/job_app?secret=private'])assert.throws(()=>publicJobUrl(u));
+assert(publicJobUrl('https://job-boards.greenhouse.io/embed/job_app?token=42'));
+const output=exportPayload('https://example.com/jobs/42',{Company:'Example',rawText:'private text',secret:'private'});assert(!('secret' in output));assert(!('rawText' in output));
+const manifest=JSON.parse(await readFile('extension/manifest.json','utf8'));assert.deepEqual(manifest.permissions,['activeTab','scripting','storage']);assert(!manifest.host_permissions);assert(!manifest.content_scripts);assert(!manifest.content_security_policy.extension_pages.includes("'unsafe-eval'"));
+console.log('Extension: single-posting extraction, grounded AI evidence beyond 1000 characters, safe URLs, minimal export and permissions passed.');

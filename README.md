@@ -127,6 +127,27 @@ To update an existing deployment, replace Apps Script `Code.gs` with the latest 
 
 **Additional Website formats:** Dayforce embedded job data, L3Harris job-page microdata, Databricks career links through its public Greenhouse API, and New York Life searches containing an exact numeric job ID are supported. Searches must contain exactly one matching public posting; ambiguous results are not selected. Past Dayforce deadlines are shown as a notice, not used as Apply Date. Distinct Simplify posting IDs are treated as separate listings even when company and title match; the same URL still triggers duplicate protection. JobDiva errors now report HTTP status and whether session setup or job retrieval failed. HTTP 403 remains a site-access limitation, not proof of a closed job.
 
+### Optional browser fallback (separate from Gmail and Website)
+
+If a website preview cannot read a job that you can see in your browser, use the optional Chrome extension. It reads the current page only when you click its icon. It does not bypass logins or website access restrictions.
+
+1. Update the Apps Script project with the regenerated `SingleFile.gs`, save, then refresh the `/dev` test deployment. For `/exec`, update the deployment to a new version. Multi-file users also add `BrowserFallback.gs` and update `Index.html`.
+2. Build the extension locally with Node.js 22 or newer:
+   ```sh
+   cd extension
+   npm ci
+   npm run build
+   ```
+   Open Chrome's Extensions page, enable Developer mode, choose **Load unpacked**, and select `extension/dist`. Build output is local and ignored by Git. The build downloads a checksum-verified WebAssembly runtime; no private settings are bundled.
+3. Open the job page and click the extension icon. Structured JobPosting data is extracted when exactly one posting is found. On noisy pages, select the relevant job description before clicking; the selection is used as AI input. Review all extracted values against the visible page.
+4. If needed, click **Download / run local AI**. This optional WebLLM/Qwen model runs on your device using WebGPU. The first run downloads hundreds of MB of model files from Hugging Face and needs GPU memory. It uses local computing resources, not ChatGPT accounts, API keys, cloud inference, or the project author's credits. If unsupported, enter the fields manually. AI sees only the first 6,000 characters; unsupported or unquoted values are discarded, but quotes do not guarantee the interpretation is correct.
+5. Check Company, Position, Location and Salary Range, leave unknown values blank, check the review box, then click **Prepare reviewed data**. Copy the selected JSON. Page text is not included.
+6. In your private Apps Script tool, open **Browser fallback**, paste the data, optionally choose Apply Date, and click **Preview reviewed fields**. The URL must match exactly one existing Notion row by normalized job identity. No new row is created. Review the proposed values, then click **Confirm and fill blanks** within 30 minutes.
+
+Blank Status is filled with `Applied`; blank Apply Date uses your chosen date or your local confirmation date. Existing fields and Website are preserved. Location and Salary Range require optional Text properties. Duplicate URLs, possible company/position duplicates, conflicting values, a changed connection or an edited row require review instead of a write. This separate workflow can fill optional blanks even on a row whose core fields are complete.
+
+**Privacy and limits:** the extension has temporary access to the tab you click, not all browsing history. It reads the top frame's visible text and JSON-LD, not cookies, input values or credentials. Page content stays in the extension; only reviewed fields you paste are sent through your private Apps Script to Notion. Model downloads expose ordinary download metadata such as IP address to the hosting service. No cloud AI fallback is used. The extension keeps one pending capture in session storage until the review page opens; close review tabs or use **Clear page data** afterward. Use **Delete cached model** to remove model files. Keep copied data private. Do not use a shared/public Apps Script deployment connected to someone else's Notion account. WebGPU performance and model downloads depend on the device and network; this is not guaranteed extraction for every website. The extension and local-AI path require browser testing on your device before regular use.
+
 ### Method 2: terminal
 
 **You are running the tool on your computer.** This requires a separate one-time Google login setup; it does not use your Apps Script deployment.
@@ -374,6 +395,21 @@ Website 補資料還可使用以下選用欄位，名稱需完全相符：
 **Thatch 與 JobDiva：** 支援 Thatch 頁面內的職缺資料。JobDiva 請保留完整 `www1.jobdiva.com/portal/` 連結，包括 `a=...` 和 `#/jobs/...`。去重會比對入口與職缺編號，忽略追蹤參數 `jr_id`。工具自動取得 JobDiva 的臨時匿名 session，不需要帳號或 API key，也不會儲存 session。公司或薪資沒有可靠資料就留白，不會把招募人員資訊當成雇主名稱。
 
 **新增網站格式：** 支援 Dayforce 頁面內職缺資料、L3Harris 職缺標記、透過公開 Greenhouse API 讀取的 Databricks 連結，以及 New York Life 含精確數字職缺編號的搜尋頁。搜尋結果必須只有一筆編號相符的公開職缺，不猜選結果。Dayforce 過期截止日會顯示提示，不當成申請日期。Simplify 職缺 ID 不同時視為不同刊登，即使公司與職稱相同也可補填；相同網址仍會去重。JobDiva 錯誤會顯示 HTTP 狀態及失敗階段；403 代表存取限制，不能據此判定職缺已關閉。
+
+### 選用：瀏覽器備援（獨立於 Gmail 與 Website）
+
+若自動預覽讀不到，但你在瀏覽器看得到職缺，可使用選用的 Chrome 擴充功能。只有按下圖示時才讀取該分頁，不會繞過登入或網站存取限制。
+
+1. 用重新產生的 `SingleFile.gs` 更新 Apps Script，儲存並重新整理 `/dev`；正式 `/exec` 請更新部署至新版本。使用多檔版本者另加入 `BrowserFallback.gs` 並更新 `Index.html`。
+2. 使用 Node.js 22 以上，在 `extension` 資料夾依序執行 `npm ci`、`npm run build`。開啟 Chrome 擴充功能頁、啟用開發人員模式，按 **Load unpacked** 選擇 `extension/dist`。建置會下載並核對 WebAssembly 執行檔雜湊；產物只留本機，不含私人設定，也不納入 Git。
+3. 開啟職缺頁並按擴充功能圖示；有唯一 JobPosting 結構資料時先擷取欄位。頁面雜訊多時可先反白職缺內容，讓 AI 使用反白文字。所有擷取欄位仍須對照頁面確認。
+4. 必要時按 **Download / run local AI**，使用 WebLLM/Qwen 在自己裝置透過 WebGPU 執行。首次從 Hugging Face 下載數百 MB 模型並使用 GPU 記憶體，不使用 ChatGPT 帳號、API key、雲端推論或作者額度。不支援的裝置仍可手填。AI 只讀前 6,000 字元；無原文引述支持的值會留白，但有引述仍可能理解錯誤。
+5. 確認 Company、Position、Location、Salary Range，不確定就留白；勾選確認後按 **Prepare reviewed data**，複製選取的 JSON，其中不含整頁文字。
+6. 在自己的 Apps Script 工具打開 **Browser fallback** 貼上資料，可選 Apply Date，再按 **Preview reviewed fields**。網址正規化後必須對應唯一既有 Notion 列，不會新增列。核對結果後於 30 分鐘內按 **Confirm and fill blanks**。
+
+只補空欄位：Status 填 `Applied`；Apply Date 使用指定日期，留白則使用確認當天的本機日期。保留既有值與 Website。Location、Salary Range 須為選用 Text 欄位。重複網址、疑似同公司職稱、內容衝突、連線更換或預覽後資料遭編輯，都會要求重新檢查。此獨立備援可補核心欄位已完整的列之選用空欄位。
+
+**隱私與限制：**擴充功能只暫時存取你按下圖示的分頁，沒有全站瀏覽權限；讀取頂層頁面可見文字與 JSON-LD，不讀 cookie、輸入欄位值或憑證。頁面內容留在擴充功能，只有你貼回的確認欄位透過私人 Apps Script 傳給 Notion。下載模型會向託管服務提供 IP 等一般下載資訊，不會使用雲端 AI 備援。待處理頁面暫存在 session storage，開啟檢查頁後移除；用完請關閉檢查分頁或按 **Clear page data**。**Delete cached model** 可刪除模型快取。複製資料請保密，不要使用連到他人 Notion 帳號的公開共用部署。速度與下載取決於裝置、網路，無法保證每個網站都能辨識；正式使用前請先在自己的瀏覽器測試擴充功能與本機 AI。
 
 ### 方法二：終端機版
 

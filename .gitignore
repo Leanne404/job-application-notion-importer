@@ -87,3 +87,21 @@ screenshots/
 *.pdf
 __pycache__/
 node_modules/
+
+# Optional browser fallback: reviewed source only.
+!/extension/
+/extension/*
+!/BrowserFallback.gs
+!/tests/browser.test.cjs
+!/tests/extension.test.mjs
+!/extension/package.json
+!/extension/package-lock.json
+!/extension/core.mjs
+!/extension/capture.mjs
+!/extension/background.mjs
+!/extension/manifest.json
+!/extension/review.html
+!/extension/review.css
+!/extension/review.mjs
+!/extension/build.mjs
+!/extension/model-integrity.json

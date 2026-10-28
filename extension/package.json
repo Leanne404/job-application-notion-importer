@@ -1,0 +1,1 @@
+{"name":"job-notion-browser-fallback","private":true,"version":"1.0.0","type":"module","scripts":{"build":"node build.mjs"},"dependencies":{"@mlc-ai/web-llm":"0.2.86"},"devDependencies":{"esbuild":"0.28.2"}}
