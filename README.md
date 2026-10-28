@@ -125,6 +125,8 @@ To update an existing deployment, replace Apps Script `Code.gs` with the latest 
 
 **Thatch and JobDiva:** Thatch embedded job data is supported. For JobDiva, keep the full `www1.jobdiva.com/portal/` link, including `a=...` and `#/jobs/...`. Duplicate checks include the tenant and job number and ignore `jr_id`. The tool automatically obtains a temporary anonymous JobDiva session; no account or API key is needed, and the session is not saved. Missing employer or salary data stays blank; recruiter details are not assumed to identify the employer.
 
+**Additional Website formats:** Dayforce embedded job data, L3Harris job-page microdata, Databricks career links through its public Greenhouse API, and New York Life searches containing an exact numeric job ID are supported. Searches must contain exactly one matching public posting; ambiguous results are not selected. Past Dayforce deadlines are shown as a notice, not used as Apply Date. Distinct Simplify posting IDs are treated as separate listings even when company and title match; the same URL still triggers duplicate protection. JobDiva errors now report HTTP status and whether session setup or job retrieval failed. HTTP 403 remains a site-access limitation, not proof of a closed job.
+
 ### Method 2: terminal
 
 **You are running the tool on your computer.** This requires a separate one-time Google login setup; it does not use your Apps Script deployment.
@@ -370,6 +372,8 @@ Website 補資料還可使用以下選用欄位，名稱需完全相符：
 更新已部署的網頁：用最新 `SingleFile.gs` 取代 Apps Script 的 `Code.gs`，按 **部署 → 管理部署 → 編輯 → 新版本 → 部署**，再重新整理原網址。原 Notion 設定可沿用。
 
 **Thatch 與 JobDiva：** 支援 Thatch 頁面內的職缺資料。JobDiva 請保留完整 `www1.jobdiva.com/portal/` 連結，包括 `a=...` 和 `#/jobs/...`。去重會比對入口與職缺編號，忽略追蹤參數 `jr_id`。工具自動取得 JobDiva 的臨時匿名 session，不需要帳號或 API key，也不會儲存 session。公司或薪資沒有可靠資料就留白，不會把招募人員資訊當成雇主名稱。
+
+**新增網站格式：** 支援 Dayforce 頁面內職缺資料、L3Harris 職缺標記、透過公開 Greenhouse API 讀取的 Databricks 連結，以及 New York Life 含精確數字職缺編號的搜尋頁。搜尋結果必須只有一筆編號相符的公開職缺，不猜選結果。Dayforce 過期截止日會顯示提示，不當成申請日期。Simplify 職缺 ID 不同時視為不同刊登，即使公司與職稱相同也可補填；相同網址仍會去重。JobDiva 錯誤會顯示 HTTP 狀態及失敗階段；403 代表存取限制，不能據此判定職缺已關閉。
 
 ### 方法二：終端機版
 

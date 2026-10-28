@@ -38,7 +38,7 @@ function websiteJobdivaRequest_(path,headers) {
   let response;
   try{response=UrlFetchApp.fetch('https://'+host+'/candPortal/rest/'+path,{method:'get',headers,muteHttpExceptions:true,followRedirects:false});}
   catch(e){throw Error('JobDiva could not be reached. Try again later.');}
-  if(response.getResponseCode()!==200)throw Error('JobDiva could not return public job data. The listing may be unavailable.');
+  if(response.getResponseCode()!==200)throw Error('JobDiva returned HTTP '+response.getResponseCode()+' during '+(path==='auth/a'?'anonymous session setup':'job retrieval')+'. Access may be blocked; this does not prove the listing is closed.');
   const body=response.getContentText();if(body.length>3000000)throw Error('The JobDiva response is too large.');
   try{return JSON.parse(body);}catch(e){throw Error('JobDiva returned unreadable job data.');}
 }
@@ -204,8 +204,27 @@ function websiteParse_(html,url) {
   const job=candidates[0];
   return websiteDetails_(websiteCompany_(job),job.title,url,websiteLocation_(job),websiteSalary_(job.baseSalary));
 }
+function websiteNextData_(html) {
+  const script=html.match(/<script\b[^>]*\bid=["']__NEXT_DATA__["'][^>]*>([\s\S]*?)<\/script>/i);
+  if(!script)throw Error('The page has no embedded job data.');
+  return JSON.parse(script[1]);
+}
+function websiteDistinctPosting_(left,right) {
+  // Distinct Simplify posting IDs are separate listings, even with identical titles.
+  try{
+    const a=websiteUrl_(left),b=websiteUrl_(right);
+    const id=u=>/^(?:www\.)?simplify\.jobs$/.test(u.host)&&(u.path.match(/^\/p\/([a-f\d-]{36})(?:\/|$)/i)||[])[1];
+    return Boolean(id(a)&&id(b)&&id(a)!==id(b));
+  }catch(e){return false;}
+}
 function websiteRead_(value) {
   const u=websiteUrl_(value),greenhouse=websiteGreenhouse_(u),match=greenhouse&&[null,...greenhouse];
+  if(/^(?:www\.)?databricks\.com$/.test(u.host)&&u.path.startsWith('/company/careers/')){
+    const id=(u.path.match(/-(\d+)\/?$/)||[])[1],queryId=(u.query.match(/(?:[?&])gh_jid=(\d+)(?:&|$)/)||[])[1];
+    if(!id||queryId&&queryId!==id)throw Error('Databricks job identifiers do not match.');
+    const result=websiteRead_('https://boards.greenhouse.io/databricks/jobs/'+id);
+    return {...result,Website:u.url,keys:[websiteKey_(u.url),...result.keys]};
+  }
   const jd=websiteJobdiva_(u);
   if(jd){
     const headers={a:jd.tenant,portalID:'1',compid:jd.compid};
@@ -261,7 +280,34 @@ function websiteRead_(value) {
     }
   }
   const final=websiteUrl_(response.url);let details;
-  if(final.host==='thatch.com'&&/^\/jobs\//.test(final.path)){
+  if(final.host==='careers.newyorklife.com'){
+    const target=(u.query.match(/(?:[?&])query=(\d+)(?:&|$)/)||[])[1],direct=(u.path.match(/^\/careers\/job\/(\d+)\/?$/)||[])[1];
+    const block=response.body.match(/<code\b[^>]*\bid=["']smartApplyData["'][^>]*>([\s\S]*?)<\/code>/i);
+    const data=block&&JSON.parse(websiteText_(block[1]));
+    const jobs=data&&(data.positions||[]).filter(j=>!j.isPrivate&&(target?String(j.ats_job_id)===target:direct&&String(j.id)===direct));
+    if(!jobs||jobs.length!==1)throw Error('New York Life: use a job detail link or an exact job-number search with one matching result.');
+    const job=jobs[0];details=websiteDetails_('New York Life',job.name,u.url,job.location,'');
+  }else if(final.host==='jobs.dayforcehcm.com'){
+    const id=(u.path.match(/\/jobs\/(\d+)\/?$/)||[])[1],data=websiteNextData_(response.body),props=data.props&&data.props.pageProps,job=props&&props.jobData;
+    if(!id||!job||String(job.jobPostingId)!==id||!job.jobTitle)throw Error('Dayforce did not return the requested job.');
+    const desc=websiteText_(String(job.jobPostingContent&&job.jobPostingContent.jobDescription||'').replace(/<[^>]*>/g,' '));
+    const subsidiary=desc.match(/(?:^|[.!?]\s+)([A-Z][A-Za-z &.,'-]{2,100}?(?:LLC|Inc\.))\s+a\s+[^.]{2,100}?\s+company,\s+is seeking\b/);
+    const company=websiteValue_(subsidiary&&subsidiary[1])||websiteCompany_({description:desc}).replace(/,\s*$/,'');
+    const attrs={};for(const a of job.jobPostingAttributes||[])attrs[a.name]=a.value;
+    const salary=websiteSalary_({currency:job.isoCurrencyRegion,value:{minValue:attrs.HiringMinRate,maxValue:attrs.HiringMaxRate}});
+    const places=(job.postingLocations||[]).map(p=>websiteValue_(p.formattedAddress)).filter(Boolean);
+    details=websiteDetails_(company,job.jobTitle,u.url,(job.hasVirtualLocation?'Remote; ':'')+places.join('; '),salary);
+    if(job.postingExpiryTimestampUTC&&Date.parse(job.postingExpiryTimestampUTC)<Date.now())details.notice='The page lists a past application deadline; details are retained for tracking.';
+  }else if(final.host==='jobs.l3harris.com'&&/^\/job\//.test(final.path)){
+    const title=response.body.match(/<span\b[^>]*\bitemprop=["']title["'][^>]*>([\s\S]*?)<\/span>/i);
+    const identity=(u.path.match(/\/(\d+)\/?$/)||[])[1],finalId=(final.path.match(/\/(\d+)\/?$/)||[])[1];
+    if(!identity||identity!==finalId||!title||!response.body.includes('L3Harris Technologies'))throw Error('L3Harris did not return a matching job page.');
+    const address={};for(const tag of response.body.matchAll(/<meta\b[^>]*>/gi)){
+      const key=tag[0].match(/\bitemprop=["'](addressLocality|addressRegion|addressCountry)["']/i),value=tag[0].match(/\bcontent=["']([^"']*)["']/i);
+      if(key&&value)address[key[1]]=websiteText_(value[1]);
+    }
+    details=websiteDetails_('L3Harris Technologies',websiteText_(title[1].replace(/<[^>]*>/g,'')),u.url,[address.addressLocality,address.addressRegion,address.addressCountry].filter(Boolean).join(', '),'');
+  }else if(final.host==='thatch.com' &&/^\/jobs\//.test(final.path)){
     const id=(u.path.match(/(?:-|\/)(\d+)\/?$/)||[])[1];
     const script=response.body.match(/<script\b[^>]*\bid=["']__NEXT_DATA__["'][^>]*>([\s\S]*?)<\/script>/i);
     const data=script&&JSON.parse(script[1]),job=data&&data.props&&data.props.pageProps&&data.props.pageProps.job;
@@ -365,7 +411,7 @@ function websiteDuplicate_(page,pages,keys,details) {
   });
   candidates.sort((a,b)=>score(b)-score(a)||String(a.created_time||'').localeCompare(String(b.created_time||''))||a.id.localeCompare(b.id));
   if(candidates[0]&&websitePageId_(candidates[0])!==websitePageId_(page))return {state:'duplicate',reason:'Same job link already exists. This duplicate row is skipped, not deleted.'};
-  if(details&&norm_(details.Company)&&norm_(details.Position)&&pages.some(p=>!candidates.some(c=>websitePageId_(c)===websitePageId_(p))&&norm_(websiteRow_(p).Company)===norm_(details.Company)&&norm_(websiteRow_(p).Position)===norm_(details.Position)))return {state:'review',reason:'Another row has the same company and position. Review this possible duplicate before filling.'};
+  if(details&&norm_(details.Company)&&norm_(details.Position)&&pages.some(p=>!candidates.some(c=>websitePageId_(c)===websitePageId_(p))&&norm_(websiteRow_(p).Company)===norm_(details.Company)&&norm_(websiteRow_(p).Position)===norm_(details.Position)&&!websiteLinks_(websiteRow_(p).Website).some(link=>websiteDistinctPosting_(link,details.Website))))return {state:'review',reason:'Another row has the same company and position. Review this possible duplicate before filling.'};
   return null;
 }
 function websiteFields_(page) {

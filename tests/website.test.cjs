@@ -337,7 +337,7 @@ console.log('206-row performance case: one three-page Notion scan, six incomplet
  state='hidden';assert.equal(ctx.websiteRead_(link)['Salary Range'],'');
  state='mismatch';assert.throws(()=>ctx.websiteRead_(link),/requested job/);
  state='portal';assert.throws(()=>ctx.websiteRead_(link),/different portal/);
- state='redirect';calls=[];assert.throws(()=>ctx.websiteRead_(link),/public job data/);assert.equal(calls.length,1);
+ state='redirect';calls=[];assert.throws(()=>ctx.websiteRead_(link),/HTTP 302 during anonymous session setup/);assert.equal(calls.length,1);
 }
 {
  const ctx=context(),url='https://thatch.com/jobs/software-engineer-42';
@@ -347,3 +347,28 @@ console.log('206-row performance case: one three-page Notion scan, six incomplet
  id=43;assert.throws(()=>ctx.websiteRead_(url),/requested job/);
 }
 console.log('Thatch embedded data and identity; JobDiva fragment identity, anonymous requests, missing fields and redirect rejection passed.');
+{
+ const ctx=context();let data={props:{pageProps:{jobData:{jobPostingId:42,jobTitle:'Developer',jobPostingContent:{jobDescription:'Example Systems, LLC a Parent Services company, is seeking a Developer.'},postingLocations:[{formattedAddress:'Maryland, USA'}],hasVirtualLocation:true,postingExpiryTimestampUTC:'2000-01-01',isoCurrencyRegion:'USD',jobPostingAttributes:[{name:'HiringMinRate',value:100000},{name:'HiringMaxRate',value:130000}]}}}};
+ ctx.websiteFetch_=url=>({url,urls:[url],body:'<script id="__NEXT_DATA__">'+JSON.stringify(data)+'</script>'});
+ let result=ctx.websiteRead_('https://jobs.dayforcehcm.com/en-US/example/candidateportal/jobs/42');assert.equal(result.Company,'Example Systems, LLC');assert.equal(result.Location,'Remote; Maryland, USA');assert.match(result.notice,/past application deadline/);assert.match(result['Salary Range'],/100,000/);
+ data.props.pageProps.jobData.jobPostingId=43;assert.throws(()=>ctx.websiteRead_('https://jobs.dayforcehcm.com/en-US/example/candidateportal/jobs/42'),/requested job/);
+ let jobs=[{ats_job_id:'42',id:99,name:'Developer',location:'New York',isPrivate:false}];
+ ctx.websiteFetch_=url=>({url,urls:[url],body:'<code id="smartApplyData">'+JSON.stringify({positions:jobs}).replace(/"/g,'&#34;')+'</code>'});
+ assert.equal(ctx.websiteRead_('https://careers.newyorklife.com/careers/?query=42').Position,'Developer');
+ assert.throws(()=>ctx.websiteRead_('https://careers.newyorklife.com/careers/?query=43'),/exact job-number/);
+ jobs.push(jobs[0]);assert.throws(()=>ctx.websiteRead_('https://careers.newyorklife.com/careers/?query=42'),/exact job-number/);
+ ctx.websiteFetch_=url=>({url,urls:[url],body:'L3Harris Technologies <span itemprop="title">Associate Engineer</span><meta itemprop="addressLocality" content="Rochester"><meta itemprop="addressRegion" content="NY">'});
+ assert.equal(ctx.websiteRead_('https://jobs.l3harris.com/job/Example/42/').Location,'Rochester, NY');
+ const requests=[];ctx.websiteFetch_=url=>{requests.push(url);return {url,urls:[url],body:JSON.stringify({id:42,title:'Engineer',company_name:'Databricks',location:{name:'Example City'}})};};
+ assert.equal(ctx.websiteRead_('http://databricks.com/company/careers/engineer-42?gh_jid=42').Company,'Databricks');assert.match(requests[0],/boards-api.greenhouse.io/);
+ assert.throws(()=>ctx.websiteRead_('https://databricks.com/company/careers/engineer-42?gh_jid=43'),/identifiers/);
+}
+{
+ const {ctx,page,setPages}=fixture(),id=n=>[String(n).repeat(8),String(n).repeat(4),String(n).repeat(4),String(n).repeat(4),String(n).repeat(12)].join('-'),link=n=>'https://simplify.jobs/p/'+id(n)+'/Engineer';
+ const other=JSON.parse(JSON.stringify(page));other.id='3'.repeat(32);other.properties.Company.title=[{plain_text:'Example Co'}];other.properties.Position.rich_text=[{plain_text:'Engineer'}];other.properties.Website.rich_text=[{text:{content:link(1)}}];page.properties.Website.rich_text=[{text:{content:link(2)}}];
+ const details={Company:'Example Co',Position:'Engineer',Website:link(2)};
+ assert.equal(ctx.websiteDuplicate_(page,[page,other],[ctx.websiteKey_(link(2))],details),null);
+ details.Website=link(1);assert.equal(ctx.websiteDuplicate_(page,[page,other],[ctx.websiteKey_(link(1))],details).state,'duplicate');
+ details.Website='https://another.example.com/jobs/42';assert.equal(ctx.websiteDuplicate_(page,[page,other],[ctx.websiteKey_(details.Website)],details).state,'review');
+}
+console.log('New York Life exact matches, Dayforce identity/deadlines, L3Harris microdata, Databricks API and distinct Simplify postings passed.');
