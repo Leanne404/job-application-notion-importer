@@ -6,6 +6,8 @@
 
 Keep your **Notion job tracker** up to date in two ways: import LinkedIn application confirmation emails from Gmail, or fill existing rows from external job websites. Preview the results before confirming any changes. The interface and prompts are English; Gmail import supports English and Traditional Chinese confirmations.
 
+**AI is optional.** Gmail import and standard Website parsing work without a browser extension, Chrome Developer mode, or a downloaded AI model. For the basic web app, follow Method 1 and skip the extension setup entirely. Only the automatic browser/local-AI fallback needs the extension. Without it, unreadable websites remain **Needs review**; successfully parsed rows can still be confirmed and filled. No AI account or API key is required.
+
 ### What it does and how to use it
 
 **1. Import applications from Gmail — web app or terminal**
@@ -127,7 +129,9 @@ To update an existing deployment, replace Apps Script `Code.gs` with the latest 
 
 **Additional Website formats:** Dayforce embedded job data, L3Harris job-page microdata, Databricks career links through its public Greenhouse API, and New York Life searches containing an exact numeric job ID are supported. Searches must contain exactly one matching public posting; ambiguous results are not selected. Past Dayforce deadlines are shown as a notice, not used as Apply Date. Distinct Simplify posting IDs are treated as separate listings even when company and title match; the same URL still triggers duplicate protection. JobDiva errors now report HTTP status and whether session setup or job retrieval failed. HTTP 403 remains a site-access limitation, not proof of a closed job.
 
-### Automatic local fallback for Website previews
+### Automatic local fallback for Website previews (optional)
+
+**Skip this entire section if you do not want browser/local-AI fallback. The basic Gmail and Website features still work without it.**
 
 Use the normal **Preview websites** button. If the server cannot read a job page, the optional Chrome extension opens that failed job link, reads its rendered text, and returns extracted fields to the same preview table. There is no copy/paste step. Gmail import is unchanged.
 
@@ -283,6 +287,9 @@ References: [Apps Script deployment](https://developers.google.com/apps-script/g
 
 這個工具用兩種方式整理你的 **Notion 求職紀錄**：從 Gmail 匯入 LinkedIn 申請確認信，或依外部職缺網站連結補齊已有資料。所有變更都先預覽，再由你確認。介面與操作提示皆為英文；Gmail 匯入支援英文與繁體中文確認信。
 
+**AI 是選用功能，不裝也能正常使用。** Gmail 匯入與原本的 Website 網頁解析，不需要安裝瀏覽器擴充功能、開啟 Chrome 開發人員模式或下載 AI 模型。只使用基本網頁版，照「方法一」設定即可，擴充功能安裝步驟可以全部跳過。只有自動瀏覽器／本機 AI 備援需要擴充功能；不安裝時，讀不到的網站保留 **Needs review**，成功解析的其他列仍可確認並填入。不需要 AI 帳號或 API key。
+
+
 ### 有哪些功能、怎麼操作
 
 **1. 從 Gmail 匯入申請紀錄（網頁版／終端機版）**
@@ -404,7 +411,9 @@ Website 補資料還可使用以下選用欄位，名稱需完全相符：
 
 **新增網站格式：** 支援 Dayforce 頁面內職缺資料、L3Harris 職缺標記、透過公開 Greenhouse API 讀取的 Databricks 連結，以及 New York Life 含精確數字職缺編號的搜尋頁。搜尋結果必須只有一筆編號相符的公開職缺，不猜選結果。Dayforce 過期截止日會顯示提示，不當成申請日期。Simplify 職缺 ID 不同時視為不同刊登，即使公司與職稱相同也可補填；相同網址仍會去重。JobDiva 錯誤會顯示 HTTP 狀態及失敗階段；403 代表存取限制，不能據此判定職缺已關閉。
 
-### Website 預覽的自動本機備援
+### Website 預覽的自動本機備援（選用）
+
+**不需要瀏覽器／本機 AI 備援，可以跳過本節所有安裝步驟；基本 Gmail 與 Website 功能仍可照常使用。**
 
 使用原本的 **Preview websites** 按鈕即可。伺服器讀不到職缺時，選用的 Chrome 擴充功能會自動開啟該連結、讀取瀏覽器顯示的文字，將擷取欄位送回同一份預覽表；不需要複製貼上。Gmail 匯入功能不變。
 
