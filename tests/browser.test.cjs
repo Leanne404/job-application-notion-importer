@@ -30,3 +30,15 @@ for(const mode of ['stale','archived','moved','connection','duplicate','removed'
 // Both inline UI scripts must parse without executing browser code.
 for(const script of fs.readFileSync('Index.html','utf8').matchAll(/<script>([\s\S]*?)<\/script>/g))new vm.Script(script[1]);
 console.log('Browser fallback: preview-only, one-use confirmation, dates, preserved fields, stale rows, duplicates and payload validation passed.');
+// Automatic fallback is eligible only after a real page-read failure, never a duplicate or unsafe host.
+{
+ const {c,page}=setup();c.websiteSnapshotRemove_=()=>{};
+ assert.equal(c.previewWebsiteRows().results[0].fallbackEligible,true);
+ c.websiteRead_=()=>{throw Error('The website must resolve to a public internet address.');};assert.equal(c.previewWebsiteRows().results[0].fallbackEligible,false);
+ page.properties.Website.rich_text=[];assert.equal(c.previewWebsiteRows().results.length,0);
+}
+{
+ const {c,payload,writes}=setup();assert.throws(()=>c.previewBrowserFallback(payload,null,'wrong-row'),/matching row changed/);
+ const p=c.previewBrowserFallback(payload,'2026-10-01');c.fillBrowserFallback(p.ticket,'2026-10-28','2026-10-02');assert.equal(writes[0].properties['Apply Date'].date.start,'2026-10-02');
+}
+console.log('Automatic backend eligibility, expected-row validation and date changes passed.');

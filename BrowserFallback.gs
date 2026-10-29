@@ -1,6 +1,6 @@
 // Independent, explicitly reviewed browser capture. Never fetches a job page or Gmail.
 function browserPayload_(raw) {
-  if(typeof raw!=='string'||raw.length>12000)throw Error('Paste reviewed browser data (maximum 12,000 characters).');
+  if(typeof raw!=='string'||raw.length>12000)throw Error('Provide browser data (maximum 12,000 characters).');
   let data;try{data=JSON.parse(raw);}catch(e){throw Error('Browser data is not valid JSON.');}
   const fields=['Company','Position','Location','Salary Range'],allowed=['format','Website'].concat(fields);
   if(!data||Array.isArray(data)||data.format!=='job-notion-browser-v1'||Object.keys(data).some(k=>!allowed.includes(k)))throw Error('Unsupported browser data format.');
@@ -17,18 +17,21 @@ function browserMatch_(pages,details) {
   const duplicate=websiteDuplicate_(page,pages,[key],details);if(duplicate)throw Error(duplicate.reason);
   return page;
 }
-function previewBrowserFallback(raw,date) {
+function previewBrowserFallback(raw,date,expectedPageId) {
   if(date)websiteDate_(date);
   const details=browserPayload_(raw),source=dataSource_();checkSchema_();
   const page=browserMatch_(websitePages_(),details),row=websiteRow_(page);
+  if(expectedPageId&&websitePageId_(page)!==String(expectedPageId).replace(/-/g,'').toLowerCase())throw Error('The matching row changed. Preview again.');
+  if(expectedPageId&&websiteComplete_(row))return {result:Object.assign({},row,{state:'complete',reason:'Core fields are already complete. Skipped.'}),ticket:null};
   const proposal=websiteProposal_(row,details,date,websiteFields_(page));
   if(proposal.state!=='ready')return {result:proposal,ticket:null};
   const ticket=Utilities.getUuid();
   CacheService.getUserCache().put('browser:'+ticket,JSON.stringify({source,pageId:page.id,edited:page.last_edited_time,url:row.Website,details,fields:proposal.fields,date:date||null}),1800);
   return {result:proposal,ticket};
 }
-function fillBrowserFallback(ticket,today) {
+function fillBrowserFallback(ticket,today,selectedDate) {
   websiteDate_(today);
+  if(selectedDate)websiteDate_(selectedDate);
   const lock=LockService.getScriptLock();if(!lock.tryLock(1000))throw Error('Another operation is running. Try again shortly.');
   try {
     const cache=CacheService.getUserCache(),key='browser:'+String(ticket),raw=cache.get(key);
@@ -41,7 +44,7 @@ function fillBrowserFallback(ticket,today) {
     const page=notion_('pages/'+preview.pageId),row=websiteRow_(page);
     if(page.archived||page.in_trash||String(page.parent&&page.parent.data_source_id||'').replace(/-/g,'')!==source.replace(/-/g,''))throw Error('The row is no longer in the connected database.');
     if(page.last_edited_time!==preview.edited||row.Website!==preview.url)throw Error('The row changed after preview. Preview again.');
-    const proposal=websiteProposal_(row,preview.details,preview.date||today,websiteFields_(page).filter(k=>preview.fields.includes(k)));
+    const proposal=websiteProposal_(row,preview.details,(selectedDate===undefined?preview.date:selectedDate)||today,websiteFields_(page).filter(k=>preview.fields.includes(k)));
     if(proposal.state!=='ready')return {result:proposal};
     const properties={},rt=value=>[{type:'text',text:{content:value}}];
     for(const field of proposal.fields)properties[field]=field==='Company'?{title:rt(proposal[field])}:['Position','Location','Salary Range'].includes(field)?{rich_text:rt(proposal[field])}:field==='Status'?{select:{name:'Applied'}}:{date:{start:proposal[field]}};

@@ -477,7 +477,9 @@ function previewWebsiteRows(cursor,date) {
       display.Website=urls[0];
       let duplicate=websiteDuplicate_(page,pages,[websiteKey_(urls[0])]);
       if(duplicate){results.push(Object.assign({},display,duplicate));continue;}
-      const details=websiteRead_(urls[0]);
+      let details;
+      try{details=websiteRead_(urls[0]);}
+      catch(e){results.push(Object.assign({},display,{state:'review',reason:e.message,fallbackEligible:!/(?:public internet address|Private addresses|address could not|different job|different portal|identifiers do not match|does not match|did not return|matching job page)/i.test(e.message)}));continue;}
       duplicate=websiteDuplicate_(page,pages,details.keys,details);
       if(!duplicate&&resolved.some(x=>x.keys.some(k=>details.keys.includes(k))))duplicate={state:'duplicate',reason:'This job already appears in this preview batch.'};
       if(duplicate){results.push(Object.assign({},display,duplicate));continue;}

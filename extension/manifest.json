@@ -1,8 +1,38 @@
 {
- "manifest_version":3,"name":"Job Notion Browser Fallback","version":"1.0.0",
- "description":"Read the job page you open, optionally extract fields with on-device AI, then export reviewed fields.",
- "permissions":["activeTab","scripting","storage"],
- "action":{"default_title":"Read this job page locally"},
- "background":{"service_worker":"background.mjs","type":"module"},
- "content_security_policy":{"extension_pages":"default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; object-src 'none'; style-src 'self'; connect-src 'self' https://huggingface.co https://*.huggingface.co https://*.hf.co; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-src 'none'"}
+  "manifest_version": 3,
+  "name": "Job Notion Browser Fallback",
+  "version": "1.1.0",
+  "description": "Automatically read failed job pages with optional on-device AI, returning fields to Website preview before confirmation.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
+  "action": {
+    "default_title": "Read this job page locally"
+  },
+  "background": {
+    "service_worker": "background.mjs",
+    "type": "module"
+  },
+  "content_security_policy": {
+    "extension_pages": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; object-src 'none'; style-src 'self'; connect-src 'self' https://huggingface.co https://*.huggingface.co https://*.hf.co; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-src 'none'"
+  },
+  "optional_host_permissions": [
+    "https://*/*",
+    "http://*/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://script.google.com/*",
+        "https://*.googleusercontent.com/*"
+      ],
+      "js": [
+        "bridge.js"
+      ],
+      "all_frames": true,
+      "run_at": "document_idle"
+    }
+  ]
 }

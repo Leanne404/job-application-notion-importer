@@ -100,8 +100,14 @@ node_modules/
 !/extension/capture.mjs
 !/extension/background.mjs
 !/extension/manifest.json
-!/extension/review.html
 !/extension/review.css
-!/extension/review.mjs
 !/extension/build.mjs
 !/extension/model-integrity.json
+!/extension/automation.mjs
+!/extension/bridge.js
+!/extension/setup.html
+!/extension/setup.mjs
+!/extension/runner.html
+!/extension/runner.mjs
+!/tests/automatic.test.cjs
+!/tests/worker.test.mjs

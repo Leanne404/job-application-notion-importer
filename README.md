@@ -20,7 +20,7 @@ Keep your **Notion job tracker** up to date in two ways: import LinkedIn applica
 - In your Notion table, create a row and paste an **external job URL into Website**. Leave the fields you want filled blank, including Location and Salary Range if your table has them. Repeat for other jobs.
 - Open **Fill from Website** and click **Preview websites**. Below that button, **Apply Date to save in Notion** is the date to write into this batch, not a search filter. Leave it blank to use your local date when you click **Fill blank fields**.
 - Click **Preview websites**, review the results, then **Fill blank fields**. The tool reads the external job page to fill available blank Company, Position, Location and Salary Range, sets blank Status to `Applied`, and fills blank Apply Date. **Missing details stay blank; available fields can still be filled. This workflow does not look for Gmail confirmations.**
-- It checks the whole database for duplicate job URLs before preview and again before writing. Duplicate rows are flagged and skipped, never deleted. Existing values are preserved. Pages that require login, block access, or lack readable job details need manual review.
+- It checks the whole database for duplicate job URLs before preview and again before writing. Duplicate rows are flagged and skipped, never deleted. Existing values are preserved. Unreadable pages can use the optional automatic browser/local-AI fallback below; unresolved pages need review.
 
 Both workflows require the five core Notion properties listed below. Gmail import fills only those five. Website fill can also populate blank **Location** and **Salary Range** when those optional **Text** properties exist. Other properties are preserved. The tool records applications you have made; it does not apply to jobs for you. Installation, permissions, and the buttons or commands for each method are explained below.
 
@@ -113,7 +113,7 @@ It fills whatever it can find: blank **Company, Position, Location, Salary Range
 
 **Example:** if a page provides a company, title and location but no salary, those available fields can be filled while Salary Range stays blank. Existing values are never overwritten. If the website omits a pay period, the salary text says `period unspecified`.
 
-**Supported pages:** public company career pages that include readable `JobPosting` structured data, plus Greenhouse standard/embedded job links and Breezy job pages with matching title/employer metadata. Also supports iCIMS same-job embedded pages and Rippling embedded job data (including published locations and pay ranges). Jobright embedded job data is supported for company, title and job location; removed/hidden listings show a history notice and unavailable salary stays blank. Jobvite career pages with matching page/job titles are supported for company, position and location; tracking parameters are omitted when fetching them. SmartRecruiters one-click links use its public posting API; EA job pages use matching job metadata. Oracle Candidate Experience job links use the public requisition-details endpoint, verify the job ID, and fill available employer, title and primary location; unavailable fields remain blank. HTTP 403 means the site refused the request and requires manual review. It follows public HTTPS redirects after checking each destination. It cannot read every website: login requirements, access blocks, JavaScript-only pages, job lists or pages without a readable job posting are flagged for manual review. Partial job postings can still fill the fields they provide. If the structured company name is empty, it also checks the job description for an explicit employer statement such as “ExampleCorp is seeking a Software Engineer.” Ambiguous names stay blank; it does not infer the company from the domain or recruiting platform. This fallback uses the same downloaded page and needs no AI API. Posting dates are not used as application dates.
+**Supported pages:** public company career pages that include readable `JobPosting` structured data, plus Greenhouse standard/embedded job links and Breezy job pages with matching title/employer metadata. Also supports iCIMS same-job embedded pages and Rippling embedded job data (including published locations and pay ranges). Jobright embedded job data is supported for company, title and job location; removed/hidden listings show a history notice and unavailable salary stays blank. Jobvite career pages with matching page/job titles are supported for company, position and location; tracking parameters are omitted when fetching them. SmartRecruiters one-click links use its public posting API; EA job pages use matching job metadata. Oracle Candidate Experience job links use the public requisition-details endpoint, verify the job ID, and fill available employer, title and primary location; unavailable fields remain blank. HTTP 403 means the site refused the server request; the optional browser fallback can try the rendered page, without bypassing access controls. It follows public HTTPS redirects after checking each destination. It cannot read every website: login requirements, access blocks, JavaScript-only pages, job lists or pages without a readable job posting are flagged for manual review. Partial job postings can still fill the fields they provide. If the structured company name is empty, it also checks the job description for an explicit employer statement such as “ExampleCorp is seeking a Software Engineer.” Ambiguous names stay blank; it does not infer the company from the domain or recruiting platform. This fallback uses the same downloaded page and needs no AI API. Posting dates are not used as application dates.
 
 **Query time:** each new Website preview reads the Notion table once (paginated), then processes only rows with Website and missing core fields. Completed rows never trigger website requests. Later batches reuse a private snapshot for that preview, which expires within 30 minutes. Each confirmed write batch still rereads Notion for current duplicate checks and rechecks its target pages and job details. Starting another preview performs a fresh scan.
 
@@ -127,26 +127,34 @@ To update an existing deployment, replace Apps Script `Code.gs` with the latest 
 
 **Additional Website formats:** Dayforce embedded job data, L3Harris job-page microdata, Databricks career links through its public Greenhouse API, and New York Life searches containing an exact numeric job ID are supported. Searches must contain exactly one matching public posting; ambiguous results are not selected. Past Dayforce deadlines are shown as a notice, not used as Apply Date. Distinct Simplify posting IDs are treated as separate listings even when company and title match; the same URL still triggers duplicate protection. JobDiva errors now report HTTP status and whether session setup or job retrieval failed. HTTP 403 remains a site-access limitation, not proof of a closed job.
 
-### Optional browser fallback (separate from Gmail and Website)
+### Automatic local fallback for Website previews
 
-If a website preview cannot read a job that you can see in your browser, use the optional Chrome extension. It reads the current page only when you click its icon. It does not bypass logins or website access restrictions.
+Use the normal **Preview websites** button. If the server cannot read a job page, the optional Chrome extension opens that failed job link, reads its rendered text, and returns extracted fields to the same preview table. There is no copy/paste step. Gmail import is unchanged.
 
-1. Update the Apps Script project with the regenerated `SingleFile.gs`, save, then refresh the `/dev` test deployment. For `/exec`, update the deployment to a new version. Multi-file users also add `BrowserFallback.gs` and update `Index.html`.
-2. Build the extension locally with Node.js 22 or newer:
+**One-time installation/update**
+
+1. Update Apps Script with the regenerated `SingleFile.gs`, save, and refresh `/dev`. For `/exec`, update the deployment to a new version. Multi-file users update `Website.gs`, `BrowserFallback.gs` and `Index.html` too. Keep the deployment restricted to yourself.
+2. With Node.js 22 or newer, build the extension:
    ```sh
    cd extension
    npm ci
    npm run build
    ```
-   Open Chrome's Extensions page, enable Developer mode, choose **Load unpacked**, and select `extension/dist`. Build output is local and ignored by Git. The build downloads a checksum-verified WebAssembly runtime; no private settings are bundled.
-3. Open the job page and click the extension icon. Structured JobPosting data is extracted when exactly one posting is found. On noisy pages, select the relevant job description before clicking; the selection is used as AI input. Review all extracted values against the visible page.
-4. If needed, click **Download / run local AI**. This optional WebLLM/Qwen model runs on your device using WebGPU. The first run downloads hundreds of MB of model files from Hugging Face and needs GPU memory. It uses local computing resources, not ChatGPT accounts, API keys, cloud inference, or the project author's credits. If unsupported, enter the fields manually. AI sees only the first 6,000 characters; unsupported or unquoted values are discarded, but quotes do not guarantee the interpretation is correct.
-5. Check Company, Position, Location and Salary Range, leave unknown values blank, check the review box, then click **Prepare reviewed data**. Copy the selected JSON. Page text is not included.
-6. In your private Apps Script tool, open **Browser fallback**, paste the data, optionally choose Apply Date, and click **Preview reviewed fields**. The URL must match exactly one existing Notion row by normalized job identity. No new row is created. Review the proposed values, then click **Confirm and fill blanks** within 30 minutes.
+   In `chrome://extensions`, enable Developer mode and **Load unpacked** → `extension/dist`. If already installed, rebuild and click **Reload** on its extension card. The build bundles a checksum-verified WebAssembly runtime; no personal settings or model weights are committed.
+3. Open your private Apps Script `/dev` or `/exec` tool tab. Click the extension icon **on that tab**, then **Enable automatic fallback**. Accept Chrome's optional HTTP/HTTPS website-access request. This access is needed to open and read different job websites automatically. Only that paired tool tab can request extraction. Re-pair after closing it or restarting Chrome; ordinary reloads of the same tool URL keep the pairing.
 
-Blank Status is filled with `Applied`; blank Apply Date uses your chosen date or your local confirmation date. Existing fields and Website are preserved. Location and Salary Range require optional Text properties. Duplicate URLs, possible company/position duplicates, conflicting values, a changed connection or an edited row require review instead of a write. This separate workflow can fill optional blanks even on a row whose core fields are complete.
+**Normal use**
 
-**Privacy and limits:** the extension has temporary access to the tab you click, not all browsing history. It reads the top frame's visible text and JSON-LD, not cookies, input values or credentials. Page content stays in the extension; only reviewed fields you paste are sent through your private Apps Script to Notion. Model downloads expose ordinary download metadata such as IP address to the hosting service. No cloud AI fallback is used. The extension keeps one pending capture in session storage until the review page opens; close review tabs or use **Clear page data** afterward. Use **Delete cached model** to remove model files. Keep copied data private. Do not use a shared/public Apps Script deployment connected to someone else's Notion account. WebGPU performance and model downloads depend on the device and network; this is not guaranteed extraction for every website. The extension and local-AI path require browser testing on your device before regular use.
+1. Put one job URL in each Notion row's Website field and click **Preview websites** as before.
+2. Successfully parsed rows use the existing workflow. Completed rows and duplicates are skipped as before. Only page-reading failures trigger local fallback; invalid/private URLs and identity-validation failures remain Needs review. A local AI tab stays open to reuse the model. Temporary job tabs open one at a time and close afterward. Keep the tool and local AI tabs open until preview finishes.
+3. The extension first tries a single structured JobPosting. If Company or Position is missing, it automatically runs **Qwen2.5 0.5B through WebLLM/WebGPU**. First use downloads hundreds of MB of model files from Hugging Face. Later jobs reuse the loaded model and browser cache. Only the first 6,000 characters are used by AI, and extracted values need a supporting quote. This reduces unsupported guesses but does not guarantee correctness.
+4. Results return to the **same Website preview table**, labeled as browser/local-AI results. Check all fields, choose Apply Date if needed, then click the existing **Fill blank fields** button. Changing the date does not rerun extraction. Blank date defaults to your local confirmation date; blank Status becomes `Applied`. Existing values and Website are preserved. No new Notion rows are created by fallback.
+
+The server matches the original job URL and original row, checks duplicates, and creates a one-use preview ticket. On confirmation it rechecks the connection, row changes, and duplicates before updating blank fields. Location and Salary Range require Text properties. Review and confirm promptly (tickets expire after 30 minutes). Failed extraction does not block successfully parsed rows. If the extension is missing, unpaired, denied permission, unavailable, or lacks WebGPU, the affected row remains **Needs review**, with the reason. It does not silently call cloud AI. Login, CAPTCHA, redirects to another job/page, or unreadable layouts may still need manual attention; there is no bypass.
+
+**Privacy and permissions:** AI runs on each user's own device, without ChatGPT/Google AI accounts, API keys, paid AI tokens, or the author's quota. Downloads use bandwidth, GPU memory, storage and electricity; Hugging Face sees ordinary download metadata such as IP address. The extension does not read Gmail, Notion secrets, cookies or form input values. Job pages open in your browser normally and may use its existing login session, but credentials are not extracted. Raw page text stays in extension memory and is not sent to a cloud AI service or Notion; only extracted fields return to the paired tool for preview. The website-access permission is broad even though the implementation reads only requested job tabs. Pair only your own trusted tool. Use **Disable and remove website access** in extension setup to revoke access, and **Delete cached model** in the local AI tab to remove model files. Pairing lives in browser session storage and is not published. Closing the tool tab cancels pending fallback work; completed previews still require confirmation. Actual WebGPU/model execution depends on your browser and hardware; local simulation tests do not certify every device or website.
+
+Chrome's [optional permission documentation](https://developer.chrome.com/docs/extensions/reference/api/permissions) explains the access prompt; [WebLLM](https://github.com/mlc-ai/web-llm) provides the on-device runtime.
 
 ### Method 2: terminal
 
@@ -382,7 +390,7 @@ Website 補資料還可使用以下選用欄位，名稱需完全相符：
 
 **例子：** 網站只有公司、職稱和地點，沒有薪資，就補抓得到的資料，Salary Range 留空。已有值不覆蓋。薪資未註明計薪週期時，文字會標示 `period unspecified`。
 
-**支援範圍：** 含可讀取 `JobPosting` 職缺資料的公司公開招募頁，以及 Greenhouse 一般／嵌入式職缺連結、具有相符職稱與公司標記的 Breezy 職缺頁。也支援 iCIMS 同一職缺的內嵌頁面與 Rippling 頁面內職缺資料（包含提供的地點及薪資範圍）。Jobright 頁面內資料可讀取公司、職稱與職缺地點；已移除／隱藏的職缺會顯示歷史紀錄提示，無可讀薪資則留空。Jobvite 招募頁可從相符的網頁標題與職稱讀取公司、職稱及地點，讀取時省略追蹤參數。SmartRecruiters one-click 連結使用公開職缺 API，EA 職缺頁使用核對職缺編號後的頁面資料；Oracle Candidate Experience 職缺連結使用公開職缺明細入口、核對職缺編號，補入可取得的雇主、職稱及主要工作地點；缺少資料的欄位留空。HTTP 403 代表網站拒絕這次讀取，需人工確認。網址轉址時會逐一檢查公開 HTTPS 目的地。無法保證所有網站都能讀取：需登入、阻擋存取、僅由 JavaScript 載入的頁面、職缺列表或完全沒有可讀職缺資料，都會標示人工確認；職缺只提供部分資料時，仍可補抓得到的欄位，公司名稱欄位為空時，也會從職缺內文的明確英文招募句（例如「ExampleCorp is seeking a Software Engineer」）擷取公司名稱。名稱有歧義就留空，不從網域或招募平台名稱猜公司。這個備援使用同一份已下載網頁，不增加網站查詢，也不需要 AI API；發布日期不會當成申請日期。
+**支援範圍：** 含可讀取 `JobPosting` 職缺資料的公司公開招募頁，以及 Greenhouse 一般／嵌入式職缺連結、具有相符職稱與公司標記的 Breezy 職缺頁。也支援 iCIMS 同一職缺的內嵌頁面與 Rippling 頁面內職缺資料（包含提供的地點及薪資範圍）。Jobright 頁面內資料可讀取公司、職稱與職缺地點；已移除／隱藏的職缺會顯示歷史紀錄提示，無可讀薪資則留空。Jobvite 招募頁可從相符的網頁標題與職稱讀取公司、職稱及地點，讀取時省略追蹤參數。SmartRecruiters one-click 連結使用公開職缺 API，EA 職缺頁使用核對職缺編號後的頁面資料；Oracle Candidate Experience 職缺連結使用公開職缺明細入口、核對職缺編號，補入可取得的雇主、職稱及主要工作地點；缺少資料的欄位留空。HTTP 403 代表網站拒絕伺服器讀取；可由選用的瀏覽器備援嘗試讀取顯示內容，但不會繞過存取限制。網址轉址時會逐一檢查公開 HTTPS 目的地。無法保證所有網站都能讀取：需登入、阻擋存取、僅由 JavaScript 載入的頁面、職缺列表或完全沒有可讀職缺資料，都會標示人工確認；職缺只提供部分資料時，仍可補抓得到的欄位，公司名稱欄位為空時，也會從職缺內文的明確英文招募句（例如「ExampleCorp is seeking a Software Engineer」）擷取公司名稱。名稱有歧義就留空，不從網域或招募平台名稱猜公司。這個備援使用同一份已下載網頁，不增加網站查詢，也不需要 AI API；發布日期不會當成申請日期。
 
 **查詢時間：** 每次新的 Website 預覽只分頁讀取 Notion 全表一次，接著只處理有 Website、必要欄位未填完的列；完成的列不會發出網站請求。後續批次沿用該次預覽的私人暫存，最長約 30 分鐘。確認寫入的每一批仍會重新讀取 Notion 驗重，並再次檢查目標列與職缺資料。重新按預覽會開始一次新的掃描。
 
@@ -396,20 +404,28 @@ Website 補資料還可使用以下選用欄位，名稱需完全相符：
 
 **新增網站格式：** 支援 Dayforce 頁面內職缺資料、L3Harris 職缺標記、透過公開 Greenhouse API 讀取的 Databricks 連結，以及 New York Life 含精確數字職缺編號的搜尋頁。搜尋結果必須只有一筆編號相符的公開職缺，不猜選結果。Dayforce 過期截止日會顯示提示，不當成申請日期。Simplify 職缺 ID 不同時視為不同刊登，即使公司與職稱相同也可補填；相同網址仍會去重。JobDiva 錯誤會顯示 HTTP 狀態及失敗階段；403 代表存取限制，不能據此判定職缺已關閉。
 
-### 選用：瀏覽器備援（獨立於 Gmail 與 Website）
+### Website 預覽的自動本機備援
 
-若自動預覽讀不到，但你在瀏覽器看得到職缺，可使用選用的 Chrome 擴充功能。只有按下圖示時才讀取該分頁，不會繞過登入或網站存取限制。
+使用原本的 **Preview websites** 按鈕即可。伺服器讀不到職缺時，選用的 Chrome 擴充功能會自動開啟該連結、讀取瀏覽器顯示的文字，將擷取欄位送回同一份預覽表；不需要複製貼上。Gmail 匯入功能不變。
 
-1. 用重新產生的 `SingleFile.gs` 更新 Apps Script，儲存並重新整理 `/dev`；正式 `/exec` 請更新部署至新版本。使用多檔版本者另加入 `BrowserFallback.gs` 並更新 `Index.html`。
-2. 使用 Node.js 22 以上，在 `extension` 資料夾依序執行 `npm ci`、`npm run build`。開啟 Chrome 擴充功能頁、啟用開發人員模式，按 **Load unpacked** 選擇 `extension/dist`。建置會下載並核對 WebAssembly 執行檔雜湊；產物只留本機，不含私人設定，也不納入 Git。
-3. 開啟職缺頁並按擴充功能圖示；有唯一 JobPosting 結構資料時先擷取欄位。頁面雜訊多時可先反白職缺內容，讓 AI 使用反白文字。所有擷取欄位仍須對照頁面確認。
-4. 必要時按 **Download / run local AI**，使用 WebLLM/Qwen 在自己裝置透過 WebGPU 執行。首次從 Hugging Face 下載數百 MB 模型並使用 GPU 記憶體，不使用 ChatGPT 帳號、API key、雲端推論或作者額度。不支援的裝置仍可手填。AI 只讀前 6,000 字元；無原文引述支持的值會留白，但有引述仍可能理解錯誤。
-5. 確認 Company、Position、Location、Salary Range，不確定就留白；勾選確認後按 **Prepare reviewed data**，複製選取的 JSON，其中不含整頁文字。
-6. 在自己的 Apps Script 工具打開 **Browser fallback** 貼上資料，可選 Apply Date，再按 **Preview reviewed fields**。網址正規化後必須對應唯一既有 Notion 列，不會新增列。核對結果後於 30 分鐘內按 **Confirm and fill blanks**。
+**首次安裝／更新**
 
-只補空欄位：Status 填 `Applied`；Apply Date 使用指定日期，留白則使用確認當天的本機日期。保留既有值與 Website。Location、Salary Range 須為選用 Text 欄位。重複網址、疑似同公司職稱、內容衝突、連線更換或預覽後資料遭編輯，都會要求重新檢查。此獨立備援可補核心欄位已完整的列之選用空欄位。
+1. 用最新 `SingleFile.gs` 更新 Apps Script，儲存後重新整理 `/dev`；正式 `/exec` 請更新部署至新版本。多檔版本也要更新 `Website.gs`、`BrowserFallback.gs`、`Index.html`。部署權限維持只有自己。
+2. 使用 Node.js 22 以上，在 `extension` 資料夾執行 `npm ci`、`npm run build`。到 `chrome://extensions` 開啟開發人員模式，按 **Load unpacked** 選擇 `extension/dist`。已安裝者重新建置後，在擴充功能卡片按 **Reload**。建置會打包已核對雜湊的 WebAssembly 執行檔，不會提交個人設定或模型權重。
+3. 開啟自己的 Apps Script `/dev` 或 `/exec` 工具分頁，**在這個分頁按擴充功能圖示**，再按 **Enable automatic fallback**，同意 Chrome 的 HTTP／HTTPS 網站存取要求。這項權限用來自動開啟與讀取不同職缺網站；只有配對的工具分頁能要求擷取。關閉該分頁或重啟 Chrome 後須重新配對；同一工具網址的一般重新整理會保留配對。
 
-**隱私與限制：**擴充功能只暫時存取你按下圖示的分頁，沒有全站瀏覽權限；讀取頂層頁面可見文字與 JSON-LD，不讀 cookie、輸入欄位值或憑證。頁面內容留在擴充功能，只有你貼回的確認欄位透過私人 Apps Script 傳給 Notion。下載模型會向託管服務提供 IP 等一般下載資訊，不會使用雲端 AI 備援。待處理頁面暫存在 session storage，開啟檢查頁後移除；用完請關閉檢查分頁或按 **Clear page data**。**Delete cached model** 可刪除模型快取。複製資料請保密，不要使用連到他人 Notion 帳號的公開共用部署。速度與下載取決於裝置、網路，無法保證每個網站都能辨識；正式使用前請先在自己的瀏覽器測試擴充功能與本機 AI。
+**日常使用**
+
+1. 每筆 Notion 的 Website 放一個職缺網址，照常按 **Preview websites**。
+2. 成功解析的列維持原流程；已完成與重複列照常略過。只有讀取頁面失敗會進入本機備援；無效／私人網址與職缺身分驗證失敗仍維持 Needs review。工具會保留一個本機 AI 分頁重用模型，逐一開啟職缺分頁，讀完後關閉。預覽完成前請保持工具與 AI 分頁開啟。
+3. 擴充功能先找唯一 JobPosting 結構資料；缺少 Company 或 Position 時，自動用 **WebLLM／WebGPU 執行 Qwen2.5 0.5B**。首次從 Hugging Face 下載數百 MB 模型，後續重用已載入模型與瀏覽器快取。AI 使用前 6,000 字元，欄位須有原文引述支持；這能減少無依據的猜測，但仍可能理解錯誤。
+4. 結果回到**原本 Website 預覽表**，註明來自瀏覽器／本機 AI。確認欄位、按需要選 Apply Date，再按原本 **Fill blank fields**。改日期不會重新擷取；留白用確認當天的本機日期，空白 Status 設為 `Applied`。保留既有值與 Website；備援不會新增 Notion 列。
+
+伺服器核對原始網址、原本那筆資料與重複紀錄後產生一次性預覽憑證；確認時再次檢查連線、資料是否變動與重複情況，才更新空欄位。Location、Salary Range 須為 Text。預覽憑證 30 分鐘後過期，請儘快確認。單筆備援失敗不會阻止已成功解析的列。未安裝、未配對、權限遭拒、擴充功能中斷或不支援 WebGPU 時，該筆保留 **Needs review** 並顯示原因，不會偷偷呼叫雲端 AI。登入、驗證碼、轉址到另一職缺或頁面、無法讀取的版型仍可能需要人工處理，不會繞過限制。
+
+**隱私與權限：**AI 在每位使用者自己的裝置執行，不需要 GPT／Google AI 帳號、API key、付費 AI token 或作者額度。會使用自己的網路、GPU 記憶體、儲存空間及電力；Hugging Face 會收到 IP 等一般下載資訊。擴充功能不讀 Gmail、Notion secret、cookie 或表單輸入值。職缺頁像一般瀏覽一樣開啟，可能使用瀏覽器已有的登入狀態，但不會擷取憑證。整頁文字留在擴充功能記憶體，不送往雲端 AI 或 Notion；只有擷取欄位送回配對工具預覽。網站權限範圍較廣，但程式只讀取被要求的職缺分頁，因此只配對自己信任的私人工具。設定頁的 **Disable and remove website access** 可撤銷權限；AI 分頁的 **Delete cached model** 可刪除模型檔案。配對存於瀏覽器 session storage，不會公開。關閉工具分頁會取消待處理備援；預覽完成仍須確認才寫入。WebGPU 與模型能否運作取決於裝置及瀏覽器，本機模擬測試無法保證每個裝置、網站都可使用。
+
+權限提示可參考 [Chrome 官方說明](https://developer.chrome.com/docs/extensions/reference/api/permissions)；本機模型由 [WebLLM](https://github.com/mlc-ai/web-llm) 執行。
 
 ### 方法二：終端機版
 

@@ -9,8 +9,8 @@
 <div class="panel"><div class="toolbar" style="margin-bottom:16px"><label for="startDate">Start date</label><input type="date" id="startDate" min="1970-01-01" max="9998-12-31"><label for="endDate">End date</label><input type="date" id="endDate" min="1970-01-01" max="9998-12-31"></div><p class="muted" id="dateHint"></p><div class="toolbar"><button id="preview">Check and preview</button><button class="secondary" id="import" disabled>Import new applications</button></div><div id="message" role="status" aria-live="polite">Choose dates, preview the results, then import.</div><p class="muted">Only missing applications are added. Matching jobs are skipped; possible duplicates are flagged for review. Existing application statuses are preserved.</p></div>
 <div class="panel table"><div id="empty">Preview companies, positions, application dates, and duplicate checks here.</div><table id="table" hidden><thead><tr><th>Company</th><th>Position</th><th>Status</th><th>Website</th><th>Apply Date</th><th>Check result</th></tr></thead><tbody id="rows"></tbody></table></div>
 <p class="muted">Supports English and Traditional Chinese LinkedIn application confirmations. Matching emails with unsupported layouts are flagged for manual review.</p></section>
-<section id="websitePanel" hidden><div class="panel"><h2>Fill from Website</h2><p>Paste an external job link into the Website column of your Notion table, one job per row. This tool reads the job website and fills available blank Company, Position, Location, Salary Range, Status (Applied), and Apply Date fields. Missing details stay blank; available details can still be filled. Rows with Company, Position, Status and Apply Date already filled are skipped, even when Location or Salary Range is blank. Your original Website link and existing values are kept.</p><p class="muted">Supports public job pages with readable job details and Greenhouse job boards. Location and Salary Range are optional Text properties. Pages requiring login or unsupported layouts are flagged for review. This workflow does not read Gmail.</p><div class="toolbar"><button id="websitePreview">Preview websites</button></div>
-<div class="website-fill-settings"><label for="websiteDate"><strong>Apply Date to save in Notion (optional)</strong></label><p id="websiteDateHelp" class="muted">This date is written to blank Apply Date fields. It is not a search filter. Leave it blank to use your local date when you click Fill blank fields. Existing dates are kept.</p><div class="toolbar"><input id="websiteDate" type="date" min="1970-01-01" max="9998-12-31" aria-describedby="websiteDateHelp"><button id="websiteFill" class="secondary" disabled>Fill blank fields</button></div></div><p class="muted">Enable Update content for your Notion connection. Duplicate rows are skipped, not deleted.</p><p id="websiteMessage" role="status" aria-live="polite">Preview first, review the results, then fill blank fields.</p></div><div class="panel table"><p id="websiteEmpty" class="muted">Website results will appear here.</p><table id="websiteTable" hidden><thead><tr><th>Company</th><th>Position</th><th>Location</th><th>Status</th><th>Website</th><th>Apply Date</th><th>Salary Range</th><th>Result</th></tr></thead><tbody id="websiteRows"></tbody></table></div></section><details class="panel" id="browserFallback"><summary>Browser fallback — reviewed page data</summary><p>Use the optional browser extension when an automatic website preview fails. Open the job page, review its fields in the extension, then paste the prepared data here. No AI API key is required. This workflow updates an existing row only; put the same job URL in its Website field first.</p><label for="browserData">Reviewed browser data</label><textarea id="browserData" rows="6" maxlength="12000" style="width:100%;font:inherit"></textarea><p><label for="browserDate">Apply Date to save in Notion (optional)</label> <input id="browserDate" type="date" min="1970-01-01" max="9998-12-31"></p><p class="muted">Leave blank to use your local date when you confirm. Existing values are preserved. Preview expires after 30 minutes.</p><div class="toolbar"><button id="browserPreview">Preview reviewed fields</button><button id="browserFill" disabled>Confirm and fill blanks</button></div><pre id="browserResult" style="white-space:pre-wrap" aria-live="polite"></pre></details></main>
+<section id="websitePanel" hidden><div class="panel"><h2>Fill from Website</h2><p>Paste an external job link into the Website column of your Notion table, one job per row. This tool reads the job website and fills available blank Company, Position, Location, Salary Range, Status (Applied), and Apply Date fields. Missing details stay blank; available details can still be filled. Rows with Company, Position, Status and Apply Date already filled are skipped, even when Location or Salary Range is blank. Your original Website link and existing values are kept.</p><p class="muted">Supports public job pages with readable job details and Greenhouse job boards. Location and Salary Range are optional Text properties. Pages requiring login or unsupported layouts are flagged for review. This workflow does not read Gmail. With the browser extension enabled and paired, failed pages automatically use browser/local AI fallback and return here for review. No AI API key is needed.</p><div class="toolbar"><button id="websitePreview">Preview websites</button></div>
+<div class="website-fill-settings"><label for="websiteDate"><strong>Apply Date to save in Notion (optional)</strong></label><p id="websiteDateHelp" class="muted">This date is written to blank Apply Date fields. It is not a search filter. Leave it blank to use your local date when you click Fill blank fields. Existing dates are kept.</p><div class="toolbar"><input id="websiteDate" type="date" min="1970-01-01" max="9998-12-31" aria-describedby="websiteDateHelp"><button id="websiteFill" class="secondary" disabled>Fill blank fields</button></div></div><p class="muted">Enable Update content for your Notion connection. Duplicate rows are skipped, not deleted.</p><p id="websiteMessage" role="status" aria-live="polite">Preview first, review the results, then fill blank fields.</p></div><div class="panel table"><p id="websiteEmpty" class="muted">Website results will appear here.</p><table id="websiteTable" hidden><thead><tr><th>Company</th><th>Position</th><th>Location</th><th>Status</th><th>Website</th><th>Apply Date</th><th>Salary Range</th><th>Result</th></tr></thead><tbody id="websiteRows"></tbody></table></div></section></main>
 <script>
 let websiteResults=[], websiteTickets=[], tickets=[], working=false;const $=id=>document.getElementById(id);const labels={new:'Ready to import',duplicate:'Already exists',review:'Needs review',created:'Created',error:'Incomplete'};
 function busy(v){working=v;for(const id of ['preview','startDate','endDate','save','secret','databaseLink','source','gmailMode','websiteMode','websiteDate','websitePreview']) $(id).disabled=v;$('import').disabled=v||!tickets.length;$('websiteFill').disabled=v||!websiteTickets.length;}
@@ -123,6 +123,7 @@ $('websitePreview').onclick=async()=>{
     if(data.results.some(r=>r.state==='ready'))websiteTickets.push(data.ticket);
     cursor=data.nextCursor;if(cursor&&seen.has(cursor))throw Error('Repeated pagination response. Preview again.');if(cursor)seen.add(cursor);
   }while(cursor);
+  if(typeof runLocalWebsiteFallback==='function')await runLocalWebsiteFallback(results);
   busy(false);$('websiteMessage').textContent=results.filter(r=>r.state==='ready').length+' rows ready; '+skipped+' completed or empty-Website rows skipped. Review the details and confirm within 30 minutes. Duplicates are checked again before writing.';
   }catch(e){websiteError(e);}
 };
@@ -134,20 +135,34 @@ $('websiteFill').onclick=async()=>{
   const queue=websiteTickets.slice();websiteTickets=[];busy(true);const results=[];
   try{for(const ticket of queue){
     $('websiteMessage').textContent='Filling blank fields... Keep this page open.';
-    const data=await call('fillWebsiteRows',ticket,today,selectedDate);results.push(...data.results);renderWebsites(results);
+    const data=ticket.browser?{results:[(await call('fillBrowserFallback',ticket.browser,today,selectedDate)).result]}:await call('fillWebsiteRows',ticket,today,selectedDate);results.push(...data.results);renderWebsites(results);
     if(data.results.some(r=>r.state==='error'))throw Error('Updates stopped. Review the results, then preview again to check completed rows.');
   }busy(false);$('websiteMessage').textContent='Done: '+results.filter(r=>r.state==='filled').length+' rows updated. Duplicates and rows needing review were skipped.';
   }catch(e){websiteError(e);}
 };
 call('connectionStatus').then(data=>{$('setup').open=!data.ready;$('setupStatus').textContent=data.ready?'Notion connection configured.':'Notion is not connected. Complete setup first.';}).catch(error);
 </script><script>
-(()=>{
- let ticket=null,running=false;const el=id=>document.getElementById(id);
- const invalidate=()=>{ticket=null;el('browserFill').disabled=true;el('browserResult').textContent='Data changed. Preview again.';};
- for(const id of ['browserData','browserDate'])el(id).addEventListener('input',invalidate);
- function state(v){running=v;for(const id of ['browserData','browserDate','browserPreview'])el(id).disabled=v;el('browserFill').disabled=v||!ticket;}
- function show(r){el('browserResult').textContent=['Company','Position','Location','Salary Range','Website','Status','Apply Date'].map(k=>k+': '+(r[k]||'—')).join('\n')+'\n\n'+r.reason;}
- el('browserPreview').onclick=async()=>{if(running)return;ticket=null;state(true);try{if(!el('browserDate').checkValidity())throw Error('Enter a valid date.');const d=await call('previewBrowserFallback',el('browserData').value,el('browserDate').value||null);ticket=d.ticket;show(d.result);}catch(e){el('browserResult').textContent=errorMessage(e);}finally{state(false);}};
- el('browserFill').onclick=async()=>{if(running||!ticket)return;const t=ticket;ticket=null;state(true);try{const n=new Date(),today=n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');show((await call('fillBrowserFallback',t,today)).result);}catch(e){el('browserResult').textContent=errorMessage(e)+' Preview again before retrying.';}finally{state(false);}};
-})();
+function localFallbackRequest(type,url,onProgress){
+ return new Promise((resolve,reject)=>{
+  const id=crypto.randomUUID(),timeout=setTimeout(()=>finish(null,Error(type==='status'?'Local fallback extension is not connected. Install or reload it, then pair this tool tab.':'Local fallback timed out. Check the local AI window and preview again.')),type==='status'?2500:500000);
+  function finish(value,error){clearTimeout(timeout);window.removeEventListener('message',receive);error?reject(error):resolve(value);}
+  function receive(event){const m=event.data;if(event.source!==window||event.origin!==location.origin||!m||m.channel!=='job-notion-response'||m.id!==id)return;if(m.progress){onProgress?.(m.progress);return;}finish(m,m.error?Error(m.error):null);}
+  window.addEventListener('message',receive);window.postMessage({channel:'job-notion-request',id,type,url},location.origin);
+ });
+}
+async function runLocalWebsiteFallback(results){
+ const failed=results.filter(r=>r.fallbackEligible===true);if(!failed.length)return;
+ try{const status=await localFallbackRequest('status');if(!status.ready)throw Error('Enable automatic fallback in the extension setup.');}
+ catch(e){for(const row of failed)row.reason+=' Local fallback unavailable: '+errorMessage(e);renderWebsites(results);return;}
+ for(const row of failed){
+  try{
+   $('websiteMessage').textContent='Local fallback: opening a failed job page. First use may download the model. Keep the tool and AI window open.';
+   const reply=await localFallbackRequest('extract',row.Website,text=>{$('websiteMessage').textContent='Local fallback: '+text;});
+   const preview=await call('previewBrowserFallback',JSON.stringify(reply.payload),$('websiteDate').value||null,row.pageId);
+   Object.assign(row,preview.result,{fallbackEligible:false});row.reason+=' '+(reply.notice||'Browser fallback. Review before filling.');
+   if(preview.ticket)websiteTickets.push({browser:preview.ticket});
+  }catch(e){row.reason+=' Local fallback: '+errorMessage(e);}
+  renderWebsites(results);
+ }
+}
 </script></body></html>
